@@ -7,8 +7,10 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { BoardPage } from '@/features/board/BoardPage'
 import './index.css'
 
+// Refetch on window focus stays on (the default) so changes made outside the
+// page, e.g. `make seed` or another tab, show up when you switch back.
 const queryClient = new QueryClient({
-  defaultOptions: { queries: { retry: 1, refetchOnWindowFocus: false } },
+  defaultOptions: { queries: { retry: 1 } },
 })
 
 createRoot(document.getElementById('root')!).render(
