@@ -1,0 +1,301 @@
+{
+    "kinds": [
+        {
+            "key": "harness",
+            "label": "Harness",
+            "icon": "terminal",
+            "fields": [
+                {
+                    "key": "form",
+                    "label": "\u5f62\u6001",
+                    "type": "select",
+                    "options": [
+                        {
+                            "value": "cli",
+                            "label": "CLI"
+                        },
+                        {
+                            "value": "ide",
+                            "label": "IDE"
+                        },
+                        {
+                            "value": "desktop",
+                            "label": "\u684c\u9762"
+                        },
+                        {
+                            "value": "web",
+                            "label": "Web"
+                        },
+                        {
+                            "value": "framework",
+                            "label": "\u6846\u67b6"
+                        }
+                    ],
+                    "showOnCard": true
+                },
+                {
+                    "key": "vendor",
+                    "label": "\u51fa\u54c1\u65b9",
+                    "type": "text"
+                },
+                {
+                    "key": "open_source",
+                    "label": "\u5f00\u6e90",
+                    "type": "bool",
+                    "showOnCard": true
+                },
+                {
+                    "key": "pricing",
+                    "label": "\u8ba1\u8d39\u65b9\u5f0f",
+                    "type": "select",
+                    "options": [
+                        {
+                            "value": "free",
+                            "label": "\u514d\u8d39"
+                        },
+                        {
+                            "value": "subscription",
+                            "label": "\u8ba2\u9605"
+                        },
+                        {
+                            "value": "usage",
+                            "label": "\u6309\u91cf"
+                        },
+                        {
+                            "value": "byok",
+                            "label": "\u81ea\u5e26 Key"
+                        }
+                    ]
+                },
+                {
+                    "key": "config_path",
+                    "label": "\u914d\u7f6e\u4f4d\u7f6e",
+                    "type": "text",
+                    "placeholder": "~/.claude/settings.json"
+                }
+            ]
+        },
+        {
+            "key": "model",
+            "label": "Model",
+            "icon": "brain",
+            "fields": [
+                {
+                    "key": "vendor",
+                    "label": "\u51fa\u54c1\u65b9",
+                    "type": "text",
+                    "required": true,
+                    "showOnCard": true
+                },
+                {
+                    "key": "model_id",
+                    "label": "\u6a21\u578b ID",
+                    "type": "text",
+                    "placeholder": "\u5b98\u65b9 API \u4e2d\u7684\u6a21\u578b\u5b57\u7b26\u4e32"
+                },
+                {
+                    "key": "context_window",
+                    "label": "\u4e0a\u4e0b\u6587\u7a97\u53e3",
+                    "type": "number",
+                    "unit": "tokens",
+                    "min": 1,
+                    "integer": true,
+                    "showOnCard": true
+                },
+                {
+                    "key": "max_output",
+                    "label": "\u6700\u5927\u8f93\u51fa",
+                    "type": "number",
+                    "unit": "tokens",
+                    "min": 1,
+                    "integer": true
+                },
+                {
+                    "key": "modalities",
+                    "label": "\u8f93\u5165\u6a21\u6001",
+                    "type": "multiselect",
+                    "options": [
+                        {
+                            "value": "text",
+                            "label": "text"
+                        },
+                        {
+                            "value": "image",
+                            "label": "image"
+                        },
+                        {
+                            "value": "audio",
+                            "label": "audio"
+                        },
+                        {
+                            "value": "video",
+                            "label": "video"
+                        },
+                        {
+                            "value": "pdf",
+                            "label": "pdf"
+                        }
+                    ]
+                },
+                {
+                    "key": "release_date",
+                    "label": "\u53d1\u5e03\u65e5\u671f",
+                    "type": "date"
+                }
+            ]
+        },
+        {
+            "key": "provider",
+            "label": "Provider",
+            "icon": "cloud",
+            "fields": [
+                {
+                    "key": "provider_type",
+                    "label": "\u7c7b\u578b",
+                    "type": "select",
+                    "options": [
+                        {
+                            "value": "official",
+                            "label": "\u5b98\u65b9"
+                        },
+                        {
+                            "value": "aggregator",
+                            "label": "\u805a\u5408"
+                        },
+                        {
+                            "value": "cloud",
+                            "label": "\u4e91\u5382\u5546"
+                        },
+                        {
+                            "value": "local",
+                            "label": "\u672c\u5730"
+                        }
+                    ],
+                    "showOnCard": true
+                },
+                {
+                    "key": "api_compat",
+                    "label": "\u517c\u5bb9\u534f\u8bae",
+                    "type": "multiselect",
+                    "options": [
+                        {
+                            "value": "openai",
+                            "label": "openai"
+                        },
+                        {
+                            "value": "anthropic",
+                            "label": "anthropic"
+                        },
+                        {
+                            "value": "gemini",
+                            "label": "gemini"
+                        }
+                    ],
+                    "showOnCard": true
+                },
+                {
+                    "key": "base_url",
+                    "label": "Base URL",
+                    "type": "url"
+                },
+                {
+                    "key": "billing",
+                    "label": "\u8ba1\u8d39",
+                    "type": "select",
+                    "options": [
+                        {
+                            "value": "prepaid",
+                            "label": "\u9884\u4ed8"
+                        },
+                        {
+                            "value": "postpaid",
+                            "label": "\u540e\u4ed8"
+                        },
+                        {
+                            "value": "subscription",
+                            "label": "\u8ba2\u9605"
+                        }
+                    ]
+                },
+                {
+                    "key": "region",
+                    "label": "\u533a\u57df",
+                    "type": "text"
+                },
+                {
+                    "key": "key_hint",
+                    "label": "\u5bc6\u94a5\u4f4d\u7f6e",
+                    "type": "text",
+                    "placeholder": "\u53ea\u8bb0\u5f55\u4f4d\u7f6e\uff0c\u5982\u201c1Password: Anthropic API\u201d\uff0c\u7981\u6b62\u586b\u5bc6\u94a5\u672c\u8eab"
+                }
+            ]
+        }
+    ],
+    "relationTypes": [
+        {
+            "key": "offered_by",
+            "fromKind": "model",
+            "toKind": "provider",
+            "label": "\u53ef\u901a\u8fc7",
+            "fields": [
+                {
+                    "key": "provider_model_id",
+                    "label": "\u6e20\u9053\u5185\u6a21\u578b ID",
+                    "type": "text",
+                    "placeholder": "\u6e20\u9053\u5185\u7684\u6a21\u578b\u540d\u4e0e\u5b98\u65b9\u4e0d\u540c\u65f6\u586b\u5199"
+                },
+                {
+                    "key": "input_price",
+                    "label": "\u8f93\u5165\u4ef7\u683c",
+                    "type": "number",
+                    "unit": "USD / \u767e\u4e07 tokens",
+                    "min": 0
+                },
+                {
+                    "key": "output_price",
+                    "label": "\u8f93\u51fa\u4ef7\u683c",
+                    "type": "number",
+                    "unit": "USD / \u767e\u4e07 tokens",
+                    "min": 0
+                }
+            ]
+        },
+        {
+            "key": "uses",
+            "fromKind": "harness",
+            "toKind": "model",
+            "label": "\u4f7f\u7528",
+            "fields": [
+                {
+                    "key": "is_default",
+                    "label": "\u9ed8\u8ba4\u6a21\u578b",
+                    "type": "bool"
+                }
+            ]
+        },
+        {
+            "key": "connects",
+            "fromKind": "harness",
+            "toKind": "provider",
+            "label": "\u63a5\u5165",
+            "fields": [
+                {
+                    "key": "note",
+                    "label": "\u5907\u6ce8",
+                    "type": "text"
+                }
+            ]
+        }
+    ],
+    "boards": [
+        {
+            "key": "ai-stack",
+            "title": "AI \u6280\u672f\u6808",
+            "columns": [
+                "harness",
+                "model",
+                "provider"
+            ]
+        }
+    ]
+}
