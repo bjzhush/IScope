@@ -32,6 +32,20 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/items/{id}", httpx.Handle(h.get))
 	mux.HandleFunc("PATCH /api/v1/items/{id}", httpx.Handle(h.update))
 	mux.HandleFunc("DELETE /api/v1/items/{id}", httpx.Handle(h.delete))
+	mux.HandleFunc("POST /api/v1/items/{id}/move", httpx.Handle(h.move))
+}
+
+func (h *Handler) move(w http.ResponseWriter, r *http.Request) error {
+	var in MoveInput
+	if err := httpx.Decode(r, &in); err != nil {
+		return err
+	}
+	it, err := h.svc.Move(r.Context(), r.PathValue("id"), in)
+	if err != nil {
+		return err
+	}
+	httpx.Write(w, http.StatusOK, it)
+	return nil
 }
 
 func (h *Handler) list(w http.ResponseWriter, r *http.Request) error {

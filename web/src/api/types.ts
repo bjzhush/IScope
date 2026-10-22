@@ -128,3 +128,48 @@ export interface CreateItemInput {
 export type ItemPatch = Partial<Omit<CreateItemInput, 'kind' | 'attrs'>> & {
   attrs?: Record<string, AttrValue | null>
 }
+
+export interface MoveInput {
+  beforeId: string | null
+  afterId: string | null
+}
+
+export interface TransferCounts {
+  created: number
+  updated: number
+  unchanged: number
+}
+
+export interface ImportSummary {
+  items: TransferCounts
+  relations: TransferCounts
+}
+
+export interface CatalogEntry {
+  providerId: string
+  providerName: string
+  modelId: string
+  officialId: string
+  name: string
+  vendor: string
+  releaseDate?: string
+  context?: number
+  output?: number
+  modalities: string[]
+  inputPrice?: number
+  outputPrice?: number
+}
+
+export interface CatalogSearch {
+  providers: { id: string; name: string; count: number }[]
+  entries: CatalogEntry[]
+  total: number
+  modelKind: string // kind of the items an import creates
+  linkKind: string // kind that can receive the model's prices
+}
+
+export interface CatalogImportResult {
+  item: Item
+  created: boolean
+  relation?: Relation
+}

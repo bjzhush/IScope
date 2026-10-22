@@ -105,6 +105,39 @@ func (q *Queries) GetItem(ctx context.Context, id string) (Item, error) {
 	return i, err
 }
 
+const getItemBySlug = `-- name: GetItemBySlug :one
+SELECT id, kind, name, slug, status, summary, tags, links, notes, rating, pinned, sort_order, attrs, created_at, updated_at, deleted_at FROM items WHERE kind = ? AND slug = ? AND deleted_at IS NULL
+`
+
+type GetItemBySlugParams struct {
+	Kind string
+	Slug string
+}
+
+func (q *Queries) GetItemBySlug(ctx context.Context, arg GetItemBySlugParams) (Item, error) {
+	row := q.db.QueryRowContext(ctx, getItemBySlug, arg.Kind, arg.Slug)
+	var i Item
+	err := row.Scan(
+		&i.ID,
+		&i.Kind,
+		&i.Name,
+		&i.Slug,
+		&i.Status,
+		&i.Summary,
+		&i.Tags,
+		&i.Links,
+		&i.Notes,
+		&i.Rating,
+		&i.Pinned,
+		&i.SortOrder,
+		&i.Attrs,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const listItems = `-- name: ListItems :many
 SELECT id, kind, name, slug, status, summary, tags, links, notes, rating, pinned, sort_order, attrs, created_at, updated_at, deleted_at FROM items
 WHERE deleted_at IS NULL
@@ -233,6 +266,21 @@ func (q *Queries) MaxSortOrder(ctx context.Context, kind string) (float64, error
 	var max_sort_order float64
 	err := row.Scan(&max_sort_order)
 	return max_sort_order, err
+}
+
+const setSortOrder = `-- name: SetSortOrder :exec
+UPDATE items SET sort_order = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL
+`
+
+type SetSortOrderParams struct {
+	SortOrder float64
+	UpdatedAt string
+	ID        string
+}
+
+func (q *Queries) SetSortOrder(ctx context.Context, arg SetSortOrderParams) error {
+	_, err := q.db.ExecContext(ctx, setSortOrder, arg.SortOrder, arg.UpdatedAt, arg.ID)
+	return err
 }
 
 const softDeleteItem = `-- name: SoftDeleteItem :execrows

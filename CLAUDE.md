@@ -35,6 +35,18 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 14. The drawer looks up relation names and add-relation candidates in the board data fetched with `includeArchived=true`. It only renders the form after the item detail has been fetched again since the drawer opened, so cached data from before another save never seeds the form.
 15. `make seed` only adds missing sample relations (`relation.Service.Ensure`). It never changes or deletes existing ones.
 
+## Phase 3 decisions
+
+16. Drag sorting only works inside a group of cards that share both pin state and status (`lib/reorder.ts`); a card dropped anywhere else snaps back. Each group gets its own `SortableContext`, and dragging starts from a grip handle.
+17. `POST /items/{id}/move` puts the item at the midpoint of its neighbours. If the gaps that would create are smaller than 1e-6, it renumbers the whole kind 1..n instead.
+18. Export and import (`internal/transfer`) run in a single transaction and match items by kind + slug. An item that already exists and differs from the file is overwritten and its `updated_at` becomes the import time. A new item keeps the timestamps from the file, so exporting, importing into an empty database and exporting again gives an identical file. Data missing from the file is left alone. Any validation error rolls back the whole import.
+19. The models.dev import (`internal/catalog`) is configured with `-catalog-url` / `AI_OVERVIEW_CATALOG_URL` and caches the catalog for one hour.
+    - `model_id` stores the vendor's official id, taken from `canonical_model_id`. Existing models are matched by that id first, then by slug.
+    - With `linkTo` set, the import upserts `offered_by` with that provider's prices. If the provider's own model id differs from the official one, it goes into `provider_model_id`.
+    - The search response names `modelKind` and `linkKind`, so the UI never hard-codes kind keys.
+20. Relation mode starts from a card's 编辑关联… menu item. Cards in related columns become checkboxes, and every toggle immediately PUTs the source's full link set with no attrs, so existing attrs are kept. Esc or 完成 leaves the mode.
+21. Screens narrower than 900px show the columns as tabs (`useMediaQuery`).
+
 ## Implementation notes
 
 - Domain errors live in `internal/apperr`. Services return them, and `httpx.WriteError` maps them to HTTP status codes, so services never import `httpx`.
@@ -42,6 +54,7 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 - shadcn uses the base-nova style, which is built on Base UI, not Radix. Use the `render` prop instead of `asChild`, `onValueChange` / `onCheckedChange`, and the `items` prop on `Select` so it shows labels instead of values.
 - Versions: react-router is v8 (library mode, same API as v7), and `@hookform/resolvers` is pinned to v5 because v6 has a peer-dependency conflict.
 - `KindIcon` looks up icons in the full lucide `icons` map. This makes the bundle bigger, but a new kind can use a new icon without frontend changes.
+- Test setup (`web/src/test/setup.ts`) stubs `ResizeObserver`, `scrollIntoView` and `matchMedia` for jsdom. Set `media.matches = true` to simulate a narrow screen.
 - `web/src/test/kinds.json` is a snapshot of `GET /api/v1/kinds` used by the page tests. Regenerate it after changing any registry definition.
 
 ## Conventions

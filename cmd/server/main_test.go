@@ -22,7 +22,7 @@ func TestRoutes(t *testing.T) {
 	}
 	defer sqldb.Close()
 	reg := kind.Default()
-	h := newHandler(reg, item.NewService(sqldb, reg), relation.NewService(sqldb, reg))
+	h := newHandler(sqldb, reg, item.NewService(sqldb, reg), relation.NewService(sqldb, reg), "http://127.0.0.1:1/none")
 
 	cases := []struct {
 		method, path string
@@ -34,6 +34,8 @@ func TestRoutes(t *testing.T) {
 		{"GET", "/api/v1/boards/ai-stack", 200, `"items":[]`},
 		{"PUT", "/api/v1/items/nope/relations", 404, `"not_found"`},
 		{"DELETE", "/api/v1/relations/nope", 404, `"not_found"`},
+		{"GET", "/api/v1/export", 200, `"version":1`},
+		{"POST", "/api/v1/items/nope/move", 404, `"not_found"`},
 		{"GET", "/api/v1/nope", 404, `"not_found"`},
 		{"POST", "/api/v1/nope", 404, `"not_found"`},
 		{"GET", "/", 200, "<"},
@@ -43,8 +45,11 @@ func TestRoutes(t *testing.T) {
 	for _, c := range cases {
 		rec := httptest.NewRecorder()
 		body := ""
-		if c.method == "PUT" {
+		if c.method == "PUT" || c.method == "POST" && strings.HasSuffix(c.path, "/move") {
 			body = `{"links":[]}`
+			if c.method == "POST" {
+				body = `{}`
+			}
 		}
 		h.ServeHTTP(rec, httptest.NewRequest(c.method, c.path, strings.NewReader(body)))
 		if rec.Code != c.status || !strings.Contains(rec.Body.String(), c.contains) {

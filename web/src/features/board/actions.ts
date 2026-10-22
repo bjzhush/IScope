@@ -6,4 +6,5 @@ export interface ItemActions {
   setStatus: (item: Item, status: Status) => void
   togglePin: (item: Item) => void
   remove: (item: Item) => void
+  link: (item: Item) => void // enter relation mode with this item as the source
 }

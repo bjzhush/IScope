@@ -274,6 +274,32 @@ func (s *Service) Ensure(ctx context.Context, aID, bID string, attrs map[string]
 	return err
 }
 
+// Upsert links a and b, merging attrs into the existing relation if there is
+// one (other keys are kept) or creating it otherwise.
+func (s *Service) Upsert(ctx context.Context, aID, bID string, attrs map[string]any) (Relation, error) {
+	current, err := s.ListForItem(ctx, aID)
+	if err != nil {
+		return Relation{}, err
+	}
+	links := make([]Link, 0, len(current)+1)
+	for _, r := range current {
+		if otherEnd(r, aID) == bID {
+			return s.Update(ctx, r.ID, PatchInput{Attrs: attrs})
+		}
+		links = append(links, Link{TargetID: otherEnd(r, aID)})
+	}
+	rels, err := s.Replace(ctx, aID, append(links, Link{TargetID: bID, Attrs: attrs}))
+	if err != nil {
+		return Relation{}, err
+	}
+	for _, r := range rels {
+		if otherEnd(r, aID) == bID {
+			return r, nil
+		}
+	}
+	return Relation{}, fmt.Errorf("upsert relation %s-%s: not found after replace", aID, bID)
+}
+
 func prefixed(prefix string, errs kind.FieldErrors) map[string]string {
 	out := make(map[string]string, len(errs))
 	for k, m := range errs {

@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from './client'
-import type { BoardView, CreateItemInput, ItemPatch, RelationLink } from './types'
+import type { BoardView, CreateItemInput, ItemPatch, MoveInput, Relation, RelationLink } from './types'
 
 export const queryKeys = {
   kinds: ['kinds'] as const,
@@ -61,6 +61,62 @@ export function useReplaceRelations(boardKey: string) {
   return useMutation({
     mutationFn: ({ id, links }: { id: string; links: RelationLink[] }) => api.replaceRelations(id, links),
     // Both ends change, so refresh every cached item detail as well as the board.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.boardAll(boardKey) })
+      qc.invalidateQueries({ queryKey: ['item'] })
+    },
+  })
+}
+
+// Optimistic reorder within a column: the item takes its new sortOrder at once.
+export function useMoveItem(boardKey: string) {
+  const qc = useQueryClient()
+  const invalidate = useInvalidateBoard(boardKey)
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: MoveInput; sortOrder: number }) => api.moveItem(id, input),
+    onMutate: async ({ id, sortOrder }) => {
+      const prefix = queryKeys.boardAll(boardKey)
+      await qc.cancelQueries({ queryKey: prefix })
+      const snapshot = qc.getQueriesData<BoardView>({ queryKey: prefix })
+      qc.setQueriesData<BoardView>({ queryKey: prefix }, (old) =>
+        old && { ...old, items: old.items.map((it) => (it.id === id ? { ...it, sortOrder } : it)) },
+      )
+      return { snapshot }
+    },
+    onError: (e, _vars, ctx) => {
+      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+      toast.error(`排序失败：${e.message}`)
+    },
+    onSettled: () => invalidate(),
+  })
+}
+
+// Relation mode: replace the source's links with `targets`, updating the
+// cached board relations at once.
+export function useSetLinks(boardKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ sourceId, targets }: { sourceId: string; targets: string[]; optimistic: Relation[] }) =>
+      api.replaceRelations(
+        sourceId,
+        targets.map((targetId) => ({ targetId })),
+      ),
+    onMutate: async ({ sourceId, optimistic }) => {
+      const prefix = queryKeys.boardAll(boardKey)
+      await qc.cancelQueries({ queryKey: prefix })
+      const snapshot = qc.getQueriesData<BoardView>({ queryKey: prefix })
+      qc.setQueriesData<BoardView>({ queryKey: prefix }, (old) =>
+        old && {
+          ...old,
+          relations: [...old.relations.filter((r) => r.fromId !== sourceId && r.toId !== sourceId), ...optimistic],
+        },
+      )
+      return { snapshot }
+    },
+    onError: (e, _vars, ctx) => {
+      ctx?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data))
+      toast.error(`关联保存失败：${e.message}`)
+    },
     onSettled: () => {
       qc.invalidateQueries({ queryKey: queryKeys.boardAll(boardKey) })
       qc.invalidateQueries({ queryKey: ['item'] })

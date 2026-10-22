@@ -40,3 +40,9 @@ FROM items WHERE kind = ? AND deleted_at IS NULL;
 
 -- name: TouchItem :exec
 UPDATE items SET updated_at = ? WHERE id = ? AND deleted_at IS NULL;
+
+-- name: SetSortOrder :exec
+UPDATE items SET sort_order = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL;
+
+-- name: GetItemBySlug :one
+SELECT * FROM items WHERE kind = ? AND slug = ? AND deleted_at IS NULL;

@@ -55,6 +55,7 @@ export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }
                 {item.pinned ? '取消置顶' : '置顶'}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => actions.setStatus(item, 'archived')}>弃用</DropdownMenuItem>
             </>

@@ -7,3 +7,19 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 }
 Element.prototype.scrollIntoView ??= function () {}
+
+// matchMedia stub; tests set `media.matches` to simulate a narrow viewport.
+export const media = { matches: false }
+window.matchMedia ??= (query: string) =>
+  ({
+    get matches() {
+      return media.matches
+    },
+    media: query,
+    onchange: null,
+    addEventListener() {},
+    removeEventListener() {},
+    addListener() {},
+    removeListener() {},
+    dispatchEvent: () => false,
+  }) as MediaQueryList

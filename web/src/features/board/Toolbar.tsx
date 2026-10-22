@@ -18,9 +18,10 @@ interface Props {
   onQuery: (q: string) => void
   onStatus: (s: Status | '') => void
   onShowArchived: (on: boolean) => void
+  extra?: React.ReactNode
 }
 
-export function Toolbar({ title, filter, onQuery, onStatus, onShowArchived }: Props) {
+export function Toolbar({ title, filter, onQuery, onStatus, onShowArchived, extra }: Props) {
   return (
     <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
       <h1 className="mr-auto text-lg font-semibold">{title}</h1>
@@ -54,6 +55,7 @@ export function Toolbar({ title, filter, onQuery, onStatus, onShowArchived }: Pr
         <Switch id="show-archived" checked={filter.showArchived} onCheckedChange={onShowArchived} />
         <Label htmlFor="show-archived">显示已弃用</Label>
       </div>
+      {extra}
     </header>
   )
 }

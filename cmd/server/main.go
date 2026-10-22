@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"flag"
 	"log/slog"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/bjzhush/ai-overview/internal/board"
+	"github.com/bjzhush/ai-overview/internal/catalog"
 	"github.com/bjzhush/ai-overview/internal/config"
 	"github.com/bjzhush/ai-overview/internal/httpx"
 	"github.com/bjzhush/ai-overview/internal/item"
@@ -19,6 +21,7 @@ import (
 	"github.com/bjzhush/ai-overview/internal/relation"
 	"github.com/bjzhush/ai-overview/internal/seed"
 	"github.com/bjzhush/ai-overview/internal/store"
+	"github.com/bjzhush/ai-overview/internal/transfer"
 	"github.com/bjzhush/ai-overview/web"
 )
 
@@ -54,7 +57,7 @@ func run() error {
 		return seed.Run(ctx, items, relations)
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: newHandler(reg, items, relations), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: newHandler(sqldb, reg, items, relations, cfg.CatalogURL), ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", cfg.Addr, "db", cfg.DB)
@@ -71,7 +74,7 @@ func run() error {
 	}
 }
 
-func newHandler(reg *kind.Registry, items *item.Service, relations *relation.Service) http.Handler {
+func newHandler(sqldb *sql.DB, reg *kind.Registry, items *item.Service, relations *relation.Service, catalogURL string) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -80,6 +83,9 @@ func newHandler(reg *kind.Registry, items *item.Service, relations *relation.Ser
 	item.NewHandler(items, relations).Register(mux)
 	relation.NewHandler(relations).Register(mux)
 	board.NewHandler(board.NewService(reg, items, relations)).Register(mux)
+	transfer.NewHandler(transfer.NewService(sqldb, items, relations)).Register(mux)
+	source := catalog.NewSource(catalogURL)
+	catalog.NewHandler(source, catalog.NewImporter(source, reg, items, relations)).Register(mux)
 	mux.HandleFunc("/api/", httpx.NotFoundAPI)
 	mux.Handle("/", httpx.SPA(web.Dist()))
 	return httpx.Recover(httpx.Logging(mux))

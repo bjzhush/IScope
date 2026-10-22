@@ -29,7 +29,12 @@ func Handle(fn HandlerFunc) http.HandlerFunc {
 // Decode reads a single JSON value into v. Unknown fields are rejected, and
 // numbers inside interface{} values decode as json.Number.
 func Decode(r *http.Request, v any) error {
-	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, maxBody))
+	return DecodeLimit(r, v, maxBody)
+}
+
+// DecodeLimit is Decode with a custom body size limit, for bulk payloads.
+func DecodeLimit(r *http.Request, v any, limit int64) error {
+	dec := json.NewDecoder(http.MaxBytesReader(nil, r.Body, limit))
 	dec.UseNumber()
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(v); err != nil {

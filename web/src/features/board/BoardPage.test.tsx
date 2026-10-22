@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import type { Item, Relation } from '@/api/types'
 import kinds from '@/test/kinds.json'
+import { media } from '@/test/setup'
 import { BoardPage } from './BoardPage'
 
 let items: Item[]
@@ -57,6 +58,34 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     items.push(it)
     return json(201, it)
   }
+  const moveId = url.pathname.match(/^\/api\/v1\/items\/([^/]+)\/move$/)?.[1]
+  if (moveId && method === 'POST') {
+    const it = items.find((i) => i.id === moveId)!
+    const before = items.find((i) => i.id === body.beforeId)
+    const after = items.find((i) => i.id === body.afterId)
+    it.sortOrder = before && after ? (before.sortOrder + after.sortOrder) / 2 : before ? before.sortOrder + 1 : after!.sortOrder - 1
+    return json(200, it)
+  }
+  if (url.pathname === '/api/v1/import' && method === 'POST') {
+    return json(200, { items: { created: body.items.length, updated: 0, unchanged: 0 }, relations: { created: 0, updated: 0, unchanged: 0 } })
+  }
+  if (url.pathname === '/api/v1/catalog') {
+    const q = (url.searchParams.get('q') ?? '').toLowerCase()
+    const entries = catalogEntries.filter((e) => e.name.toLowerCase().includes(q))
+    return json(200, {
+      providers: [{ id: 'anthropic', name: 'Anthropic', count: 2 }],
+      entries,
+      total: entries.length,
+      modelKind: 'model',
+      linkKind: 'provider',
+    })
+  }
+  if (url.pathname === '/api/v1/catalog/import' && method === 'POST') {
+    const e = catalogEntries.find((x) => x.modelId === body.modelId)!
+    const it = mk({ kind: 'model', name: e.name, attrs: { vendor: e.vendor } })
+    items.push(it)
+    return json(201, { item: it, created: true })
+  }
   if (id && !found) return fail(404, 'not_found', {})
   if (id && method === 'GET') return json(200, { ...found, relations: relationsOf(found!.id) })
   const relId = url.pathname.match(/^\/api\/v1\/items\/([^/]+)\/relations$/)?.[1]
@@ -101,6 +130,13 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
 function relationsOf(id: string) {
   return relations.filter((r) => r.fromId === id || r.toId === id)
 }
+
+const catalogEntries = [
+  { providerId: 'anthropic', providerName: 'Anthropic', modelId: 'claude-opus-5-5', officialId: 'claude-opus-5-5',
+    name: 'Claude Opus 5.5', vendor: 'Anthropic', context: 1000000, modalities: ['text'], inputPrice: 5, outputPrice: 25 },
+  { providerId: 'anthropic', providerName: 'Anthropic', modelId: 'claude-haiku-5-5', officialId: 'claude-haiku-5-5',
+    name: 'Claude Haiku 5.5', vendor: 'Anthropic', context: 200000, modalities: ['text'] },
+]
 
 let location = ''
 function LocationProbe() {
@@ -148,7 +184,10 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(fakeFetch))
 })
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {
+  vi.unstubAllGlobals()
+  media.matches = false
+})
 
 test('renders columns in board order with cards built from field definitions', async () => {
   renderPage()
@@ -418,4 +457,122 @@ test('relation save failure keeps the drawer open; retry resends only relations'
   expect(writes).toEqual(['POST', 'PUT', 'PUT']) // no second POST
   const cursor = items.find((i) => i.name === 'Cursor')!
   expect(relations.some((r) => r.fromId === cursor.id && r.type === 'uses')).toBe(true)
+})
+
+test('relation mode: checkboxes on relatable columns, each toggle saves the full set', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  const idOf = (n: string) => items.find((i) => i.name === n)!.id
+  await user.click(await screen.findByRole('button', { name: 'Claude Code 菜单' }))
+  await user.click(await screen.findByRole('menuitem', { name: '编辑关联…' }))
+
+  expect(screen.getByRole('status', { name: '关联模式' })).toHaveTextContent('Claude Code')
+  // Models and providers become checkboxes; the source's own column does not.
+  expect(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' })).toHaveAttribute('aria-checked', 'true')
+  expect(screen.getByRole('checkbox', { name: 'OpenRouter' })).toHaveAttribute('aria-checked', 'false')
+  expect(screen.queryByRole('checkbox', { name: 'OpenCode' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'OpenCode' }).dataset.emphasis).toBe('dim')
+  expect(screen.queryByRole('button', { name: 'OpenCode 菜单' })).toBeNull()
+
+  await user.click(screen.getByRole('checkbox', { name: 'Anthropic API' }))
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Anthropic API' })).toHaveAttribute('aria-checked', 'true'))
+  await user.click(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' }))
+  await waitFor(() => expect(screen.getByRole('checkbox', { name: 'Claude Sonnet 5.5' })).toHaveAttribute('aria-checked', 'false'))
+
+  const puts = requests.filter((r) => r.method === 'PUT').map((r) => r.body)
+  expect(puts).toEqual([
+    { links: [{ targetId: idOf('Claude Sonnet 5.5') }, { targetId: idOf('Anthropic API') }] },
+    { links: [{ targetId: idOf('Anthropic API') }] },
+  ])
+
+  // Clicking a non-relatable card does nothing in this mode; Esc leaves it.
+  await user.click(screen.getByRole('button', { name: 'OpenCode' }))
+  expect(screen.queryByRole('dialog')).toBeNull()
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('status', { name: '关联模式' })).toBeNull()
+  expect(screen.queryByRole('checkbox', { name: 'Anthropic API' })).toBeNull()
+})
+
+test('narrow screens show one column per tab', async () => {
+  media.matches = true
+  const user = userEvent.setup()
+  renderPage()
+  const tabs = await screen.findAllByRole('tab')
+  expect(tabs.map((t) => t.textContent)).toEqual(['Harness 2', 'Model 1', 'Provider 2'])
+  expect(screen.getByRole('button', { name: 'Claude Code' })).toBeInTheDocument()
+  await user.click(screen.getByRole('tab', { name: 'Model 1' }))
+  expect(await screen.findByRole('button', { name: 'Claude Sonnet 5.5' })).toBeVisible()
+})
+
+test('data menu exports via a download link and imports a chosen file', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: '数据' }))
+  const exportItem = await screen.findByRole('menuitem', { name: '导出 JSON' })
+  expect(exportItem.closest('a') ?? exportItem).toHaveAttribute('href', '/api/v1/export')
+  await user.keyboard('{Escape}')
+
+  const input = screen.getByLabelText('选择要导入的 JSON 文件')
+  const doc = { version: 1, items: [{ kind: 'harness', name: 'X', slug: 'x' }], relations: [] }
+  await user.upload(input, new File([JSON.stringify(doc)], 'data.json', { type: 'application/json' }))
+  await waitFor(() => expect(requests.some((r) => r.path === '/api/v1/import')).toBe(true))
+  expect(requests.find((r) => r.path === '/api/v1/import')!.body).toEqual(doc)
+
+  await user.upload(input, new File(['not json'], 'bad.json', { type: 'application/json' }))
+  expect(requests.filter((r) => r.path === '/api/v1/import')).toHaveLength(1)
+})
+
+test('models.dev import: search, pick, price goes to the matching provider, drawer opens', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: '数据' }))
+  await user.click(await screen.findByRole('menuitem', { name: '从 models.dev 导入模型…' }))
+  const dlg = within(await screen.findByRole('dialog'))
+  await user.type(dlg.getByLabelText('搜索模型'), 'opus')
+  const option = await dlg.findByRole('option', { name: /Claude Opus 5.5/ })
+  await waitFor(() => expect(dlg.queryByRole('option', { name: /Haiku/ })).toBeNull())
+  await user.click(option)
+  // "Anthropic API" is preselected because its name matches the catalog provider.
+  expect(dlg.getByLabelText('同时把价格记录到渠道')).toHaveTextContent('Anthropic API')
+  expect(dlg.getByText(/\$5 \/ \$25/, { selector: 'p' })).toBeInTheDocument()
+  await user.click(dlg.getByRole('button', { name: '导入' }))
+
+  await waitFor(() => expect(location).toContain('item='))
+  const body = requests.find((r) => r.path === '/api/v1/catalog/import')!.body
+  expect(body).toEqual({
+    providerId: 'anthropic',
+    modelId: 'claude-opus-5-5',
+    linkTo: items.find((i) => i.name === 'Anthropic API')!.id,
+  })
+})
+
+test('keyboard drag reorders within a group and saves the new neighbours', async () => {
+  items.push(mk({ kind: 'harness', name: 'Cursor', sortOrder: 50 }))
+  // jsdom has no layout: stack cards vertically by document order.
+  const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const cards = Array.from(document.querySelectorAll('article'))
+    const i = cards.indexOf(this.closest('article') as HTMLElement)
+    const top = Math.max(i, 0) * 100
+    return { x: 0, y: top, top, left: 0, width: 300, height: 80, right: 300, bottom: top + 80, toJSON() {} } as DOMRect
+  })
+  const user = userEvent.setup()
+  renderPage()
+  const handle = await screen.findByRole('button', { name: '拖动 Cursor' })
+  // A card alone in its group (pinned Claude Code) has no handle.
+  expect(screen.queryByRole('button', { name: '拖动 Claude Code' })).toBeNull()
+
+  handle.focus()
+  await user.keyboard('[Space]')
+  await user.keyboard('[ArrowUp]')
+  await user.keyboard('[Space]')
+
+  await waitFor(() => expect(requests.some((r) => r.path.endsWith('/move'))).toBe(true))
+  const req = requests.find((r) => r.path.endsWith('/move'))!
+  expect(req.path).toBe(`/api/v1/items/${items.find((i) => i.name === 'Cursor')!.id}/move`)
+  expect(req.body).toEqual({ beforeId: null, afterId: items.find((i) => i.name === 'OpenCode')!.id })
+  await waitFor(() => {
+    const harness = within(column('Harness')).getAllByRole('button', { name: /^(OpenCode|Cursor)$/ })
+    expect(harness.map((c) => c.getAttribute('aria-label'))).toEqual(['Cursor', 'OpenCode'])
+  })
+  rect.mockRestore()
 })

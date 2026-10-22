@@ -5,6 +5,10 @@ import type {
   Item,
   ItemDetail,
   ItemPatch,
+  CatalogImportResult,
+  CatalogSearch,
+  ImportSummary,
+  MoveInput,
   Relation,
   RelationLink,
 } from './types'
@@ -50,4 +54,11 @@ export const api = {
   deleteItem: (id: string) => request<void>('DELETE', `/items/${encodeURIComponent(id)}`),
   replaceRelations: (id: string, links: RelationLink[]) =>
     request<Relation[]>('PUT', `/items/${encodeURIComponent(id)}/relations`, { links }),
+  moveItem: (id: string, input: MoveInput) => request<Item>('POST', `/items/${encodeURIComponent(id)}/move`, input),
+  exportUrl: `${BASE}/export`,
+  importData: (doc: unknown) => request<ImportSummary>('POST', '/import', doc),
+  catalog: (q: string, provider: string) =>
+    request<CatalogSearch>('GET', `/catalog?${new URLSearchParams({ q, provider })}`),
+  catalogImport: (input: { providerId: string; modelId: string; linkTo?: string }) =>
+    request<CatalogImportResult>('POST', '/catalog/import', input),
 }
