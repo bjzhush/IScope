@@ -254,6 +254,20 @@ func (q *Queries) SoftDeleteItem(ctx context.Context, arg SoftDeleteItemParams) 
 	return result.RowsAffected()
 }
 
+const touchItem = `-- name: TouchItem :exec
+UPDATE items SET updated_at = ? WHERE id = ? AND deleted_at IS NULL
+`
+
+type TouchItemParams struct {
+	UpdatedAt string
+	ID        string
+}
+
+func (q *Queries) TouchItem(ctx context.Context, arg TouchItemParams) error {
+	_, err := q.db.ExecContext(ctx, touchItem, arg.UpdatedAt, arg.ID)
+	return err
+}
+
 const updateItem = `-- name: UpdateItem :one
 UPDATE items SET
   name = ?, slug = ?, status = ?, summary = ?, tags = ?, links = ?, notes = ?,

@@ -9,6 +9,7 @@ import (
 
 	"github.com/bjzhush/ai-overview/internal/apperr"
 	"github.com/bjzhush/ai-overview/internal/item"
+	"github.com/bjzhush/ai-overview/internal/relation"
 )
 
 func s(v string) *string { return &v }
@@ -63,11 +64,31 @@ var samples = []item.CreateInput{
 			"billing": "postpaid", "region": "us-east-1", "key_hint": "~/.aws/credentials 的 work profile"}},
 }
 
-// Run inserts every sample whose kind+slug does not exist yet.
-func Run(ctx context.Context, svc *item.Service) error {
+type ref struct{ kind, slug string }
+
+// sampleLinks covers all three relation types; either end may come first.
+var sampleLinks = []struct {
+	a, b  ref
+	attrs map[string]any
+}{
+	{ref{"model", "claude-sonnet-5-5"}, ref{"provider", "anthropic-api"}, map[string]any{"input_price": 3, "output_price": 15}},
+	{ref{"model", "claude-opus-5-5"}, ref{"provider", "anthropic-api"}, map[string]any{"input_price": 5, "output_price": 25}},
+	{ref{"model", "claude-sonnet-5-5"}, ref{"provider", "openrouter"}, map[string]any{"provider_model_id": "anthropic/claude-sonnet-5.5", "input_price": 3, "output_price": 15}},
+	{ref{"provider", "aws-bedrock"}, ref{"model", "claude-sonnet-5-5"}, map[string]any{"provider_model_id": "anthropic.claude-sonnet-5-5-v1:0"}},
+	{ref{"model", "gemini-3-pro"}, ref{"provider", "openrouter"}, map[string]any{"provider_model_id": "google/gemini-3-pro"}},
+	{ref{"harness", "claude-code"}, ref{"model", "claude-sonnet-5-5"}, map[string]any{"is_default": true}},
+	{ref{"harness", "claude-code"}, ref{"model", "claude-opus-5-5"}, nil},
+	{ref{"harness", "opencode"}, ref{"model", "gemini-3-pro"}, nil},
+	{ref{"harness", "claude-code"}, ref{"provider", "anthropic-api"}, map[string]any{"note": "订阅登录"}},
+	{ref{"harness", "opencode"}, ref{"provider", "openrouter"}, nil},
+}
+
+// Run inserts every sample whose kind+slug does not exist yet, then adds the
+// sample relations that are missing. Existing data is never modified.
+func Run(ctx context.Context, items *item.Service, relations *relation.Service) error {
 	created, skipped := 0, 0
 	for _, in := range samples {
-		_, err := svc.Create(ctx, in)
+		_, err := items.Create(ctx, in)
 		switch {
 		case apperr.Is(err, apperr.Conflict):
 			skipped++
@@ -77,6 +98,26 @@ func Run(ctx context.Context, svc *item.Service) error {
 			created++
 		}
 	}
-	slog.Info("seed done", "created", created, "skipped", skipped)
+
+	all, err := items.List(ctx, item.ListFilter{})
+	if err != nil {
+		return err
+	}
+	ids := map[ref]string{}
+	for _, it := range all {
+		ids[ref{it.Kind, it.Slug}] = it.ID
+	}
+	linked := 0
+	for _, l := range sampleLinks {
+		a, b := ids[l.a], ids[l.b]
+		if a == "" || b == "" {
+			continue // the user deleted one end; leave it alone
+		}
+		if err := relations.Ensure(ctx, a, b, l.attrs); err != nil {
+			return fmt.Errorf("seed relation %v-%v: %w", l.a, l.b, err)
+		}
+		linked++
+	}
+	slog.Info("seed done", "created", created, "skipped", skipped, "relations", linked)
 	return nil
 }

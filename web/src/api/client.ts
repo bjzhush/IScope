@@ -5,6 +5,8 @@ import type {
   Item,
   ItemDetail,
   ItemPatch,
+  Relation,
+  RelationLink,
 } from './types'
 
 const BASE = '/api/v1'
@@ -46,4 +48,6 @@ export const api = {
   updateItem: (id: string, patch: ItemPatch) =>
     request<Item>('PATCH', `/items/${encodeURIComponent(id)}`, patch),
   deleteItem: (id: string) => request<void>('DELETE', `/items/${encodeURIComponent(id)}`),
+  replaceRelations: (id: string, links: RelationLink[]) =>
+    request<Relation[]>('PUT', `/items/${encodeURIComponent(id)}/relations`, { links }),
 }

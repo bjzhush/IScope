@@ -93,8 +93,14 @@ func TestRegistrationChecks(t *testing.T) {
 		{"required bool", "cannot be required", func(r *Registry) {
 			r.RegisterKind(Kind{Key: "c", Fields: []Field{{Key: "f", Type: FieldBool, Required: true}}})
 		}},
-		{"integer on text", "min/integer", func(r *Registry) {
+		{"integer on text", "min/integer/prefix", func(r *Registry) {
 			r.RegisterKind(Kind{Key: "c", Fields: []Field{{Key: "f", Type: FieldText, Integer: true}}})
+		}},
+		{"prefix on text", "min/integer/prefix", func(r *Registry) {
+			r.RegisterKind(Kind{Key: "c", Fields: []Field{{Key: "f", Type: FieldText, Prefix: "$"}}})
+		}},
+		{"shortLabel on text", "shortLabel", func(r *Registry) {
+			r.RegisterKind(Kind{Key: "c", Fields: []Field{{Key: "f", Type: FieldText, ShortLabel: "x"}}})
 		}},
 		{"relation unknown kind", "unknown kind", func(r *Registry) {
 			r.RegisterRelation(RelationType{Key: "r", FromKind: "a", ToKind: "zzz"})

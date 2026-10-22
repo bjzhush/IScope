@@ -2,17 +2,29 @@ package item
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 
 	"github.com/bjzhush/ai-overview/internal/apperr"
 	"github.com/bjzhush/ai-overview/internal/httpx"
+	"github.com/bjzhush/ai-overview/internal/relation"
 )
 
-type Handler struct{ svc *Service }
+// RelationLister supplies the relations shown in item detail.
+type RelationLister interface {
+	ListForItem(ctx context.Context, itemID string) ([]relation.Relation, error)
+}
 
-func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+type Handler struct {
+	svc       *Service
+	relations RelationLister
+}
+
+func NewHandler(svc *Service, relations RelationLister) *Handler {
+	return &Handler{svc: svc, relations: relations}
+}
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/items", httpx.Handle(h.list))
@@ -52,7 +64,11 @@ func (h *Handler) get(w http.ResponseWriter, r *http.Request) error {
 	if err != nil {
 		return err
 	}
-	httpx.Write(w, http.StatusOK, Detail{Item: it, Relations: []any{}})
+	rels, err := h.relations.ListForItem(r.Context(), it.ID)
+	if err != nil {
+		return err
+	}
+	httpx.Write(w, http.StatusOK, Detail{Item: it, Relations: rels})
 	return nil
 }
 

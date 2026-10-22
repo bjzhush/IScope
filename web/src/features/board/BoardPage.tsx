@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router'
 import { useBoard, useDeleteItem, useKinds, useQuickUpdate } from '@/api/queries'
 import type { Item, Kind } from '@/api/types'
 import { ItemSheet } from '@/features/editor/ItemSheet'
 import { matchesFilter } from '@/lib/filter'
+import { buildAdjacency } from '@/lib/relations'
 import { compareItems } from '@/lib/sort'
 import type { ItemActions } from './actions'
 import { Column } from './Column'
@@ -17,6 +18,9 @@ export function BoardPage() {
   const board = useBoard(key, f.filter.showArchived)
   const quick = useQuickUpdate(key)
   const del = useDeleteItem(key)
+
+  const [hovered, setHovered] = useState<string | null>(null)
+  const adjacency = useMemo(() => buildAdjacency(board.data?.relations ?? []), [board.data])
 
   const kindByKey = useMemo(
     () => new Map<string, Kind>((kinds.data?.kinds ?? []).map((k) => [k.key, k])),
@@ -35,6 +39,14 @@ export function BoardPage() {
       return [{ kind, items }]
     })
   }, [board.data, kindByKey, f.filter])
+
+  // A card can vanish under the pointer (deleted, filtered) without mouseleave.
+  const hoverActive = hovered !== null && columns.some((c) => c.items.some((it) => it.id === hovered))
+  const emphasis = (id: string) => {
+    if (!hoverActive) return undefined
+    if (id === hovered) return 'focus'
+    return adjacency.get(hovered)?.has(id) ? 'neighbor' : 'dim'
+  }
 
   const actions: ItemActions = {
     edit: (it: Item) => f.openItem(it.id),
@@ -74,12 +86,16 @@ export function BoardPage() {
             filtered={filtered}
             actions={actions}
             onAdd={() => f.openNew(kind.key)}
+            emphasis={emphasis}
+            onHover={setHovered}
           />
         ))}
       </main>
       <ItemSheet
         boardKey={key}
         kinds={kindByKey}
+        columns={board.data.board.columns}
+        relationTypes={kinds.data.relationTypes}
         editingId={f.editingId}
         newKind={f.newKind}
         onClose={f.closeSheet}

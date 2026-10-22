@@ -28,6 +28,13 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 10. The board query key is `['board', key, { includeArchived }]`.
 11. `make seed` runs `server -seed` and exits. It skips any `kind + slug` that already exists, so running it twice is safe.
 
+## Phase 2 decisions (relations)
+
+12. Relation chips show the relation fields marked `ShowOnCard`. A number field shows its `Prefix` (prices show as `$3`), and a bool field shows its `ShortLabel` when true (`默认`).
+13. Any change to a relation also updates `updated_at` on both items it links. A PUT that changes nothing writes nothing.
+14. The drawer looks up relation names and add-relation candidates in the board data fetched with `includeArchived=true`. It only renders the form after the item detail has been fetched again since the drawer opened, so cached data from before another save never seeds the form.
+15. `make seed` only adds missing sample relations (`relation.Service.Ensure`). It never changes or deletes existing ones.
+
 ## Implementation notes
 
 - Domain errors live in `internal/apperr`. Services return them, and `httpx.WriteError` maps them to HTTP status codes, so services never import `httpx`.

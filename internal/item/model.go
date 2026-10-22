@@ -1,6 +1,8 @@
 // Package item implements CRUD for board items of every kind.
 package item
 
+import "github.com/bjzhush/ai-overview/internal/relation"
+
 const (
 	StatusInUse    = "in_use"
 	StatusWatching = "watching"
@@ -32,10 +34,10 @@ type Item struct {
 	UpdatedAt string         `json:"updatedAt"`
 }
 
-// Detail is the GET /items/{id} payload. Relations arrive in phase 2.
+// Detail is the GET /items/{id} payload.
 type Detail struct {
 	Item
-	Relations []any `json:"relations"`
+	Relations []relation.Relation `json:"relations"`
 }
 
 type CreateInput struct {

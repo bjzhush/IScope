@@ -37,3 +37,6 @@ ORDER BY kind, sort_order, id;
 -- name: MaxSortOrder :one
 SELECT CAST(COALESCE(MAX(sort_order), 0) AS REAL) AS max_sort_order
 FROM items WHERE kind = ? AND deleted_at IS NULL;
+
+-- name: TouchItem :exec
+UPDATE items SET updated_at = ? WHERE id = ? AND deleted_at IS NULL;

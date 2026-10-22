@@ -6,12 +6,15 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/bjzhush/ai-overview/internal/relation"
 )
 
 func newTestServer(t *testing.T) http.Handler {
 	t.Helper()
 	mux := http.NewServeMux()
-	NewHandler(newTestService(t)).Register(mux)
+	s := newTestService(t)
+	NewHandler(s, relation.NewService(s.db, s.reg)).Register(mux)
 	return mux
 }
 

@@ -30,16 +30,20 @@ type Option struct {
 }
 
 type Field struct {
-	Key         string    `json:"key"`
-	Label       string    `json:"label"`
-	Type        FieldType `json:"type"`
-	Options     []Option  `json:"options,omitempty"` // select / multiselect
-	Required    bool      `json:"required,omitempty"`
-	Unit        string    `json:"unit,omitempty"`    // shown as input suffix
-	Min         *float64  `json:"min,omitempty"`     // number
-	Integer     bool      `json:"integer,omitempty"` // number: whole numbers only
-	ShowOnCard  bool      `json:"showOnCard,omitempty"`
-	Placeholder string    `json:"placeholder,omitempty"`
+	Key      string    `json:"key"`
+	Label    string    `json:"label"`
+	Type     FieldType `json:"type"`
+	Options  []Option  `json:"options,omitempty"` // select / multiselect
+	Required bool      `json:"required,omitempty"`
+	Unit     string    `json:"unit,omitempty"`    // shown as input suffix
+	Min      *float64  `json:"min,omitempty"`     // number
+	Integer  bool      `json:"integer,omitempty"` // number: whole numbers only
+	// On item fields: shown on the card. On relation fields: shown in the
+	// relation chip summary.
+	ShowOnCard  bool   `json:"showOnCard,omitempty"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Prefix      string `json:"prefix,omitempty"`     // number: compact display prefix, e.g. "$"
+	ShortLabel  string `json:"shortLabel,omitempty"` // bool: compact text when true, e.g. "默认"
 }
 
 type Kind struct {
@@ -167,6 +171,15 @@ func (r *Registry) Board(key string) (Board, bool) {
 	return Board{}, false
 }
 
+func (r *Registry) RelationType(key string) (RelationType, bool) {
+	for _, x := range r.relations {
+		if x.Key == key {
+			return x, true
+		}
+	}
+	return RelationType{}, false
+}
+
 // RelationBetween finds the relation type linking kinds a and b in either
 // direction. forward reports whether a is the stored "from" side.
 func (r *Registry) RelationBetween(a, b string) (rt RelationType, forward bool, ok bool) {
@@ -216,8 +229,11 @@ func checkFields(owner string, fields []Field) {
 		if f.Type == FieldBool && f.Required {
 			panic(where + ": bool fields cannot be required")
 		}
-		if f.Type != FieldNumber && (f.Min != nil || f.Integer) {
-			panic(where + ": min/integer only allowed on number")
+		if f.Type != FieldNumber && (f.Min != nil || f.Integer || f.Prefix != "") {
+			panic(where + ": min/integer/prefix only allowed on number")
+		}
+		if f.Type != FieldBool && f.ShortLabel != "" {
+			panic(where + ": shortLabel only allowed on bool")
 		}
 	}
 }

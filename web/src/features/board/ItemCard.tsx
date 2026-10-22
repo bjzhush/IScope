@@ -9,7 +9,18 @@ import { ItemMenu } from './ItemMenu'
 
 const MAX_TAGS = 3
 
-export function ItemCard({ item, fields, actions }: { item: Item; fields: Field[]; actions: ItemActions }) {
+// Hover linking: the hovered card, its direct neighbours, and everything else.
+export type Emphasis = 'focus' | 'neighbor' | 'dim' | undefined
+
+interface Props {
+  item: Item
+  fields: Field[]
+  actions: ItemActions
+  emphasis?: Emphasis
+  onHover?: (id: string | null) => void
+}
+
+export function ItemCard({ item, fields, actions, emphasis, onHover }: Props) {
   const meta = cardMeta(fields, item)
   const extraTags = item.tags.length - MAX_TAGS
 
@@ -18,7 +29,10 @@ export function ItemCard({ item, fields, actions }: { item: Item; fields: Field[
       role="button"
       tabIndex={0}
       aria-label={item.name}
+      data-emphasis={emphasis}
       onClick={() => actions.edit(item)}
+      onMouseEnter={() => onHover?.(item.id)}
+      onMouseLeave={() => onHover?.(null)}
       onKeyDown={(e) => {
         if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
           e.preventDefault()
@@ -27,7 +41,8 @@ export function ItemCard({ item, fields, actions }: { item: Item; fields: Field[
       }}
       className={cn(
         'group cursor-pointer rounded-lg border bg-card p-3 text-left shadow-xs transition-[opacity,border-color] outline-none hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring',
-        item.status === 'archived' && 'opacity-60',
+        emphasis === 'dim' ? 'opacity-30' : item.status === 'archived' && 'opacity-60',
+        emphasis === 'neighbor' && 'border-primary ring-1 ring-primary',
       )}
     >
       <div className="flex items-center gap-2">

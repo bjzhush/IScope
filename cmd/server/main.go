@@ -16,6 +16,7 @@ import (
 	"github.com/bjzhush/ai-overview/internal/httpx"
 	"github.com/bjzhush/ai-overview/internal/item"
 	"github.com/bjzhush/ai-overview/internal/kind"
+	"github.com/bjzhush/ai-overview/internal/relation"
 	"github.com/bjzhush/ai-overview/internal/seed"
 	"github.com/bjzhush/ai-overview/internal/store"
 	"github.com/bjzhush/ai-overview/web"
@@ -48,11 +49,12 @@ func run() error {
 
 	reg := kind.Default()
 	items := item.NewService(sqldb, reg)
+	relations := relation.NewService(sqldb, reg)
 	if cfg.Seed {
-		return seed.Run(ctx, items)
+		return seed.Run(ctx, items, relations)
 	}
 
-	srv := &http.Server{Addr: cfg.Addr, Handler: newHandler(reg, items), ReadHeaderTimeout: 5 * time.Second}
+	srv := &http.Server{Addr: cfg.Addr, Handler: newHandler(reg, items, relations), ReadHeaderTimeout: 5 * time.Second}
 	errc := make(chan error, 1)
 	go func() {
 		slog.Info("listening", "addr", cfg.Addr, "db", cfg.DB)
@@ -69,14 +71,15 @@ func run() error {
 	}
 }
 
-func newHandler(reg *kind.Registry, items *item.Service) http.Handler {
+func newHandler(reg *kind.Registry, items *item.Service, relations *relation.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /api/v1/healthz", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
 	reg.Register(mux)
-	item.NewHandler(items).Register(mux)
-	board.NewHandler(board.NewService(reg, items)).Register(mux)
+	item.NewHandler(items, relations).Register(mux)
+	relation.NewHandler(relations).Register(mux)
+	board.NewHandler(board.NewService(reg, items, relations)).Register(mux)
 	mux.HandleFunc("/api/", httpx.NotFoundAPI)
 	mux.Handle("/", httpx.SPA(web.Dist()))
 	return httpx.Recover(httpx.Logging(mux))

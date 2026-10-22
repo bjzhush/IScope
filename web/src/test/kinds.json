@@ -249,14 +249,18 @@
                     "label": "\u8f93\u5165\u4ef7\u683c",
                     "type": "number",
                     "unit": "USD / \u767e\u4e07 tokens",
-                    "min": 0
+                    "min": 0,
+                    "showOnCard": true,
+                    "prefix": "$"
                 },
                 {
                     "key": "output_price",
                     "label": "\u8f93\u51fa\u4ef7\u683c",
                     "type": "number",
                     "unit": "USD / \u767e\u4e07 tokens",
-                    "min": 0
+                    "min": 0,
+                    "showOnCard": true,
+                    "prefix": "$"
                 }
             ]
         },
@@ -269,7 +273,9 @@
                 {
                     "key": "is_default",
                     "label": "\u9ed8\u8ba4\u6a21\u578b",
-                    "type": "bool"
+                    "type": "bool",
+                    "showOnCard": true,
+                    "shortLabel": "\u9ed8\u8ba4"
                 }
             ]
         },
@@ -282,7 +288,8 @@
                 {
                     "key": "note",
                     "label": "\u5907\u6ce8",
-                    "type": "text"
+                    "type": "text",
+                    "showOnCard": true
                 }
             ]
         }

@@ -24,8 +24,10 @@ export interface Field {
   unit?: string
   min?: number
   integer?: boolean
-  showOnCard?: boolean
+  showOnCard?: boolean // item field: on the card; relation field: in the chip summary
   placeholder?: string
+  prefix?: string // number: compact display prefix, e.g. "$"
+  shortLabel?: string // bool: compact text when true, e.g. "默认"
 }
 
 export interface Kind {
@@ -83,14 +85,30 @@ export interface Item {
   updatedAt: string
 }
 
+export interface Relation {
+  id: string
+  type: string
+  fromId: string
+  toId: string
+  attrs: Attrs
+  createdAt: string
+  updatedAt: string
+}
+
 export interface ItemDetail extends Item {
-  relations: unknown[]
+  relations: Relation[]
 }
 
 export interface BoardView {
   board: Board
   items: Item[]
-  relations: unknown[]
+  relations: Relation[]
+}
+
+// One entry of PUT /items/{id}/relations; omitting attrs keeps existing ones.
+export interface RelationLink {
+  targetId: string
+  attrs?: Attrs
 }
 
 export interface CreateItemInput {

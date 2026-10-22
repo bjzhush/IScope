@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { FormProvider, useForm, type Path, type Resolver } from 'react-hook-form'
 import { toast } from 'sonner'
 import { ApiError } from '@/api/client'
-import { useCreateItem, useItem, useUpdateItem } from '@/api/queries'
-import type { Item, Kind, Status } from '@/api/types'
+import { useBoard, useCreateItem, useItem, useReplaceRelations, useUpdateItem } from '@/api/queries'
+import type { Item, ItemDetail, Kind, RelationType, Status } from '@/api/types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,21 +18,28 @@ import {
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { relationTypeBetween } from '@/lib/relations'
 import { buildItemSchema, diffPatch, itemToForm, toCreateInput, type ItemFormValues } from '@/lib/schema'
 import { BasicFields } from './BasicFields'
 import { DynamicField } from './DynamicField'
+import { draftErrors, draftsFromRelations, newDraft, relationsPayload } from './relationDrafts'
+import { RelationGroup } from './RelationGroup'
 
 interface Props {
   boardKey: string
   kinds: Map<string, Kind>
+  columns: string[]
+  relationTypes: RelationType[]
   editingId: string | null
   newKind: string | null
   onClose: () => void
 }
 
-export function ItemSheet({ boardKey, kinds, editingId, newKind, onClose }: Props) {
+export function ItemSheet({ boardKey, kinds, columns, relationTypes, editingId, newKind, onClose }: Props) {
   const open = !!editingId || !!newKind
   const detail = useItem(editingId)
+  // Names and candidates for relations, archived items included.
+  const lookup = useBoard(boardKey, true)
   const dirty = useRef(false)
   const [confirmDiscard, setConfirmDiscard] = useState(false)
 
@@ -47,7 +54,10 @@ export function ItemSheet({ boardKey, kinds, editingId, newKind, onClose }: Prop
   const kind = kinds.get(editingId ? (item?.kind ?? '') : (newKind ?? ''))
 
   let body: React.ReactNode
-  if (editingId && detail.isPending) body = <SheetMessage title="加载中…" />
+  // Wait for a fetch made after opening: the cache may hold a version from
+  // before another save, and the form only reads its data once.
+  const stale = !!editingId && !detail.isFetchedAfterMount && !detail.error
+  if (stale || lookup.isPending) body = <SheetMessage title="加载中…" />
   else if (editingId && detail.error) body = <SheetMessage title="无法打开条目" text={detail.error.message} />
   else if (!kind) body = <SheetMessage title="未知的类型" text={newKind ?? item?.kind} />
   else
@@ -56,6 +66,10 @@ export function ItemSheet({ boardKey, kinds, editingId, newKind, onClose }: Prop
         key={editingId ?? `new:${newKind}`}
         boardKey={boardKey}
         kind={kind}
+        kinds={kinds}
+        columns={columns}
+        relationTypes={relationTypes}
+        boardItems={lookup.data?.items ?? []}
         item={item}
         onDirtyChange={(d) => {
           dirty.current = d
@@ -102,13 +116,18 @@ const BASE_PATHS = new Set(['name', 'status', 'summary', 'tags', 'links', 'ratin
 interface FormProps {
   boardKey: string
   kind: Kind
-  item?: Item
+  kinds: Map<string, Kind>
+  columns: string[]
+  relationTypes: RelationType[]
+  boardItems: Item[] // every item of the board, archived included
+  item?: ItemDetail
   onDirtyChange: (dirty: boolean) => void
   onDone: () => void
   onCancel: () => void
 }
 
-function ItemForm({ boardKey, kind, item, onDirtyChange, onDone, onCancel }: FormProps) {
+function ItemForm(props: FormProps) {
+  const { boardKey, kind, kinds, columns, relationTypes, boardItems, item, onDirtyChange, onDone, onCancel } = props
   const schema = useMemo(() => buildItemSchema(kind.fields), [kind.fields])
   const initial = useMemo(() => itemToForm(kind.fields, item), [kind.fields, item])
   const form = useForm<ItemFormValues>({
@@ -117,13 +136,38 @@ function ItemForm({ boardKey, kind, item, onDirtyChange, onDone, onCancel }: For
   })
   const create = useCreateItem(boardKey)
   const update = useUpdateItem(boardKey)
+  const replace = useReplaceRelations(boardKey)
   const [formError, setFormError] = useState<string | null>(null)
-  const busy = create.isPending || update.isPending
+  const busy = create.isPending || update.isPending || replace.isPending
+
+  // Relations are drawer-local until 保存. The baselines move forward after
+  // each successful step so a retry only resends what is still unsaved.
+  const initialDrafts = useMemo(
+    () => (item ? draftsFromRelations(item.id, item.relations, relationTypes) : []),
+    [item, relationTypes],
+  )
+  const [drafts, setDrafts] = useState(initialDrafts)
+  const savedId = useRef(item?.id)
+  const savedValues = useRef(initial)
+  const savedDrafts = useRef(initialDrafts)
+  const relErrors = useMemo(() => draftErrors(drafts), [drafts])
+
+  const groups = useMemo(
+    () =>
+      columns.flatMap((col) => {
+        const other = kinds.get(col)
+        const type = col === kind.key ? undefined : relationTypeBetween(relationTypes, kind.key, col)
+        return other && type ? [{ kind: other, type }] : []
+      }),
+    [columns, kinds, kind.key, relationTypes],
+  )
+  const itemsById = useMemo(() => new Map(boardItems.map((it) => [it.id, it])), [boardItems])
 
   const { isDirty } = form.formState
+  const relationsDirty = relationsPayload(initialDrafts, drafts) !== null
   useEffect(() => {
-    onDirtyChange(isDirty)
-  }, [onDirtyChange, isDirty])
+    onDirtyChange(isDirty || relationsDirty)
+  }, [onDirtyChange, isDirty, relationsDirty])
 
   // Field errors from the server land under the matching input; anything that
   // has no input in the form is shown at the bottom.
@@ -147,25 +191,47 @@ function ItemForm({ boardKey, kind, item, onDirtyChange, onDone, onCancel }: For
   const save = (status?: Status) =>
     form.handleSubmit(async (values) => {
       setFormError(null)
+      if (relErrors.size) {
+        setFormError('请检查标红的关联属性')
+        return
+      }
       const v = status ? { ...values, status } : values
+
+      // Step 1: the item itself.
+      let id = savedId.current
       try {
-        if (item) {
-          const patch = diffPatch(kind.fields, initial, v)
-          if (Object.keys(patch).length) await update.mutateAsync({ id: item.id, patch })
+        if (!id) {
+          id = (await create.mutateAsync(toCreateInput(kind.key, kind.fields, v))).id
+          savedId.current = id
         } else {
-          await create.mutateAsync(toCreateInput(kind.key, kind.fields, v))
+          const patch = diffPatch(kind.fields, savedValues.current, v)
+          if (Object.keys(patch).length) await update.mutateAsync({ id, patch })
         }
-        toast.success(item ? '已保存' : `已新增 ${v.name.trim()}`)
-        onDone()
+        savedValues.current = v
       } catch (e) {
         applyServerError(e)
+        return
       }
+
+      // Step 2: relations, only when they changed.
+      const links = relationsPayload(savedDrafts.current, drafts)
+      if (links) {
+        try {
+          await replace.mutateAsync({ id, links })
+          savedDrafts.current = drafts
+        } catch (e) {
+          setFormError(`条目已保存，关联保存失败：${e instanceof Error ? e.message : String(e)}。可再次点击保存重试。`)
+          return
+        }
+      }
+      toast.success(item ? '已保存' : `已新增 ${v.name.trim()}`)
+      onDone()
     })
 
   const archived = item?.status === 'archived'
   return (
     <FormProvider {...form}>
-      <form className="flex h-full min-h-0 flex-col" onSubmit={save()} noValidate>
+      <form className="flex h-full min-h-0 flex-col" onSubmit={(e) => save()(e)} noValidate>
         <SheetHeader className="border-b">
           <SheetTitle>{item ? `编辑 ${item.name}` : `新增 ${kind.label}`}</SheetTitle>
           <SheetDescription>{kind.label}</SheetDescription>
@@ -185,6 +251,35 @@ function ItemForm({ boardKey, kind, item, onDirtyChange, onDone, onCancel }: For
               </div>
             </>
           )}
+          {groups.length > 0 && (
+            <>
+              <Separator className="my-5" />
+              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">关联</h3>
+              <div className="grid gap-4">
+                {groups.map(({ kind: other, type }) => {
+                  const mine = drafts.filter((d) => itemsById.get(d.targetId)?.kind === other.key)
+                  const linked = new Set(drafts.map((d) => d.targetId))
+                  return (
+                    <RelationGroup
+                      key={other.key}
+                      kind={other}
+                      drafts={mine}
+                      itemsById={itemsById}
+                      candidates={boardItems.filter(
+                        (it) => it.kind === other.key && it.status !== 'archived' && !linked.has(it.id),
+                      )}
+                      errors={relErrors}
+                      onAdd={(targetId) => setDrafts((ds) => [...ds, newDraft(targetId, type)])}
+                      onRemove={(targetId) => setDrafts((ds) => ds.filter((d) => d.targetId !== targetId))}
+                      onAttrsChange={(targetId, attrs) =>
+                        setDrafts((ds) => ds.map((d) => (d.targetId === targetId ? { ...d, attrs } : d)))
+                      }
+                    />
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
 
         <footer className="grid gap-2 border-t px-4 py-3">
@@ -195,7 +290,7 @@ function ItemForm({ boardKey, kind, item, onDirtyChange, onDone, onCancel }: For
           )}
           <div className="flex items-center gap-2">
             {item && (
-              <Button type="button" variant="outline" disabled={busy} onClick={save(archived ? 'watching' : 'archived')}>
+              <Button type="button" variant="outline" disabled={busy} onClick={(e) => save(archived ? 'watching' : 'archived')(e)}>
                 {archived ? '恢复' : '弃用'}
               </Button>
             )}

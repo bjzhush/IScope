@@ -3,7 +3,7 @@ import type { Item, Kind } from '@/api/types'
 import { KindIcon } from '@/components/KindIcon'
 import { Button } from '@/components/ui/button'
 import type { ItemActions } from './actions'
-import { ItemCard } from './ItemCard'
+import { type Emphasis, ItemCard } from './ItemCard'
 
 interface Props {
   kind: Kind
@@ -11,9 +11,11 @@ interface Props {
   filtered: boolean // a search or status filter is active
   actions: ItemActions
   onAdd: () => void
+  emphasis: (id: string) => Emphasis
+  onHover: (id: string | null) => void
 }
 
-export function Column({ kind, items, filtered, actions, onAdd }: Props) {
+export function Column({ kind, items, filtered, actions, onAdd, emphasis, onHover }: Props) {
   return (
     <section aria-label={kind.label} className="flex min-h-0 flex-col rounded-xl bg-muted/40 p-2">
       <div className="flex items-center gap-2 px-1 pb-2">
@@ -26,7 +28,14 @@ export function Column({ kind, items, filtered, actions, onAdd }: Props) {
       </div>
       <div className="flex flex-col gap-2 overflow-y-auto">
         {items.map((it) => (
-          <ItemCard key={it.id} item={it} fields={kind.fields} actions={actions} />
+          <ItemCard
+            key={it.id}
+            item={it}
+            fields={kind.fields}
+            actions={actions}
+            emphasis={emphasis(it.id)}
+            onHover={onHover}
+          />
         ))}
         {items.length === 0 && (
           <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">

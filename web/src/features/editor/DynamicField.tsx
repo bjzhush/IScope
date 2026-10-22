@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
-import type { ItemFormValues } from '@/lib/schema'
+import type { FormAttrValue, ItemFormValues } from '@/lib/schema'
 import { FormRow } from './FormRow'
 
 // Options below this count render as a toggle group, otherwise a searchable popover.
@@ -29,8 +29,32 @@ export function DynamicField({ field }: { field: Field }) {
   const { control } = useFormContext<ItemFormValues>()
   const { field: ctl, fieldState } = useController({ control, name })
   const id = `field-${name}`
-  const invalid = !!fieldState.error
 
+  return (
+    <FormRow id={id} label={field.label} required={field.required} error={fieldState.error?.message}>
+      <FieldControl
+        field={field}
+        id={id}
+        value={ctl.value}
+        onChange={ctl.onChange}
+        onBlur={ctl.onBlur}
+        invalid={!!fieldState.error}
+      />
+    </FormRow>
+  )
+}
+
+interface ControlProps {
+  field: Field
+  id: string
+  value: FormAttrValue
+  onChange: (v: FormAttrValue) => void
+  onBlur?: () => void
+  invalid?: boolean
+}
+
+// The input for one field type, independent of any form library.
+export function FieldControl({ field, id, value, onChange, onBlur, invalid = false }: ControlProps) {
   let input: React.ReactNode
   switch (field.type) {
     case 'text':
@@ -42,9 +66,9 @@ export function DynamicField({ field }: { field: Field }) {
           type={field.type === 'text' ? 'text' : field.type}
           placeholder={field.placeholder}
           aria-invalid={invalid}
-          value={ctl.value as string}
-          onChange={ctl.onChange}
-          onBlur={ctl.onBlur}
+          value={value as string}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
         />
       )
       break
@@ -54,9 +78,9 @@ export function DynamicField({ field }: { field: Field }) {
           id={id}
           placeholder={field.placeholder}
           aria-invalid={invalid}
-          value={ctl.value as string}
-          onChange={ctl.onChange}
-          onBlur={ctl.onBlur}
+          value={value as string}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur}
         />
       )
       break
@@ -71,9 +95,9 @@ export function DynamicField({ field }: { field: Field }) {
             min={field.min}
             placeholder={field.placeholder}
             aria-invalid={invalid}
-            value={ctl.value as string}
-            onChange={ctl.onChange}
-            onBlur={ctl.onBlur}
+            value={value as string}
+            onChange={(e) => onChange(e.target.value)}
+            onBlur={onBlur}
           />
           {field.unit && (
             <InputGroupAddon align="inline-end">
@@ -85,12 +109,12 @@ export function DynamicField({ field }: { field: Field }) {
       break
     case 'bool':
       input = (
-        <Switch id={id} aria-invalid={invalid} checked={ctl.value === true} onCheckedChange={ctl.onChange} />
+        <Switch id={id} aria-invalid={invalid} checked={value === true} onCheckedChange={onChange} />
       )
       break
     case 'select':
       input = (
-        <SelectField id={id} options={field.options ?? []} value={ctl.value as string} onChange={ctl.onChange} invalid={invalid} />
+        <SelectField id={id} options={field.options ?? []} value={value as string} onChange={onChange} invalid={invalid} />
       )
       break
     case 'multiselect': {
@@ -98,8 +122,8 @@ export function DynamicField({ field }: { field: Field }) {
         id,
         label: field.label,
         options: field.options ?? [],
-        value: ctl.value as string[],
-        onChange: ctl.onChange,
+        value: value as string[],
+        onChange,
       }
       input =
         props.options.length < TOGGLE_MAX_OPTIONS ? <MultiToggle {...props} /> : <MultiPopover {...props} />
@@ -107,11 +131,7 @@ export function DynamicField({ field }: { field: Field }) {
     }
   }
 
-  return (
-    <FormRow id={id} label={field.label} required={field.required} error={fieldState.error?.message}>
-      {input}
-    </FormRow>
-  )
+  return input
 }
 
 function SelectField(props: {

@@ -55,20 +55,20 @@ func RegisterAIStack(r *Registry) {
 		Key: "offered_by", FromKind: "model", ToKind: "provider", Label: "可通过",
 		Fields: []Field{
 			{Key: "provider_model_id", Label: "渠道内模型 ID", Type: FieldText, Placeholder: "渠道内的模型名与官方不同时填写"},
-			{Key: "input_price", Label: "输入价格", Type: FieldNumber, Unit: "USD / 百万 tokens", Min: ptr(0)},
-			{Key: "output_price", Label: "输出价格", Type: FieldNumber, Unit: "USD / 百万 tokens", Min: ptr(0)},
+			{Key: "input_price", Label: "输入价格", Type: FieldNumber, Unit: "USD / 百万 tokens", Min: ptr(0), Prefix: "$", ShowOnCard: true},
+			{Key: "output_price", Label: "输出价格", Type: FieldNumber, Unit: "USD / 百万 tokens", Min: ptr(0), Prefix: "$", ShowOnCard: true},
 		},
 	})
 	r.RegisterRelation(RelationType{
 		Key: "uses", FromKind: "harness", ToKind: "model", Label: "使用",
 		Fields: []Field{
-			{Key: "is_default", Label: "默认模型", Type: FieldBool},
+			{Key: "is_default", Label: "默认模型", Type: FieldBool, ShortLabel: "默认", ShowOnCard: true},
 		},
 	})
 	r.RegisterRelation(RelationType{
 		Key: "connects", FromKind: "harness", ToKind: "provider", Label: "接入",
 		Fields: []Field{
-			{Key: "note", Label: "备注", Type: FieldText},
+			{Key: "note", Label: "备注", Type: FieldText, ShowOnCard: true},
 		},
 	})
 

@@ -3,11 +3,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
-import type { Item } from '@/api/types'
+import type { Item, Relation } from '@/api/types'
 import kinds from '@/test/kinds.json'
 import { BoardPage } from './BoardPage'
 
 let items: Item[]
+let relations: Relation[]
+let failNextPut = false
 let requests: { method: string; path: string; body?: unknown }[]
 let seq = 0
 
@@ -39,7 +41,13 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
   if (url.pathname === '/api/v1/kinds') return json(200, kinds)
   if (url.pathname === '/api/v1/boards/ai-stack') {
     const all = url.searchParams.get('includeArchived') === 'true'
-    return json(200, { board: kinds.boards[0], items: items.filter((i) => all || i.status !== 'archived'), relations: [] })
+    const visible = items.filter((i) => all || i.status !== 'archived')
+    const ids = new Set(visible.map((i) => i.id))
+    return json(200, {
+      board: kinds.boards[0],
+      items: visible,
+      relations: relations.filter((r) => ids.has(r.fromId) && ids.has(r.toId)),
+    })
   }
   if (url.pathname === '/api/v1/items' && method === 'POST') {
     if (items.some((i) => i.kind === body.kind && i.name.toLowerCase() === body.name.toLowerCase()))
@@ -50,7 +58,30 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     return json(201, it)
   }
   if (id && !found) return fail(404, 'not_found', {})
-  if (id && method === 'GET') return json(200, { ...found, relations: [] })
+  if (id && method === 'GET') return json(200, { ...found, relations: relationsOf(found!.id) })
+  const relId = url.pathname.match(/^\/api\/v1\/items\/([^/]+)\/relations$/)?.[1]
+  if (relId && method === 'PUT') {
+    if (failNextPut) {
+      failNextPut = false
+      return json(500, { error: { code: 'internal', message: '服务器内部错误' } })
+    }
+    const self = items.find((i) => i.id === relId)!
+    const keep = new Set<string>()
+    for (const l of body.links as { targetId: string; attrs?: Record<string, never> }[]) {
+      const target = items.find((i) => i.id === l.targetId)!
+      const rt = kinds.relationTypes.find(
+        (t) => (t.fromKind === self.kind && t.toKind === target.kind) || (t.toKind === self.kind && t.fromKind === target.kind),
+      )
+      if (!rt) return fail(400, 'bad_request', {})
+      const [fromId, toId] = rt.fromKind === self.kind ? [self.id, target.id] : [target.id, self.id]
+      let r = relations.find((x) => x.fromId === fromId && x.toId === toId)
+      if (!r) relations.push((r = { id: `r${++seq}`, type: rt.key, fromId, toId, attrs: {}, createdAt: '', updatedAt: '' }))
+      if (l.attrs) r.attrs = l.attrs
+      keep.add(r.id)
+    }
+    relations = relations.filter((r) => keep.has(r.id) || (r.fromId !== relId && r.toId !== relId))
+    return json(200, relationsOf(relId))
+  }
   if (id && method === 'PATCH') {
     const { attrs, ...rest } = body
     Object.assign(found!, rest)
@@ -65,6 +96,10 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
     return json(204)
   }
   return fail(404, 'not_found', {})
+}
+
+function relationsOf(id: string) {
+  return relations.filter((r) => r.fromId === id || r.toId === id)
 }
 
 let location = ''
@@ -102,7 +137,14 @@ beforeEach(() => {
     mk({ kind: 'model', name: 'Claude Sonnet 5.5', status: 'in_use',
       attrs: { vendor: 'Anthropic', context_window: 1000000 } }),
     mk({ kind: 'provider', name: 'OpenRouter', attrs: { provider_type: 'aggregator', api_compat: ['openai', 'anthropic'] } }),
+    mk({ kind: 'provider', name: 'Anthropic API', attrs: { provider_type: 'official' } }),
   ]
+  const id = (name: string) => items.find((i) => i.name === name)!.id
+  relations = [
+    { id: 'r1', type: 'uses', fromId: id('Claude Code'), toId: id('Claude Sonnet 5.5'), attrs: { is_default: true }, createdAt: '', updatedAt: '' },
+    { id: 'r2', type: 'offered_by', fromId: id('Claude Sonnet 5.5'), toId: id('OpenRouter'), attrs: { input_price: 3, output_price: 15 }, createdAt: '', updatedAt: '' },
+  ]
+  failNextPut = false
   vi.stubGlobal('fetch', vi.fn(fakeFetch))
 })
 
@@ -279,4 +321,101 @@ test('card menu: archive, restore, pin and delete with confirmation', async () =
     ['PATCH', { status: 'watching' }],
     ['DELETE', undefined],
   ])
+})
+
+test('hovering a card highlights direct neighbours and dims the rest', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  const emphasis = () =>
+    Object.fromEntries(
+      ['Claude Code', 'OpenCode', 'Claude Sonnet 5.5', 'OpenRouter', 'Anthropic API'].map((n) => [n, card(n).dataset.emphasis ?? '']),
+    )
+
+  await user.hover(card('Claude Code'))
+  // Only one hop: Sonnet is linked, OpenRouter (Sonnet's provider) is not.
+  expect(emphasis()).toEqual({
+    'Claude Code': 'focus', OpenCode: 'dim', 'Claude Sonnet 5.5': 'neighbor', OpenRouter: 'dim', 'Anthropic API': 'dim',
+  })
+  expect(card('OpenCode').className).toContain('opacity-30')
+
+  await user.hover(card('Claude Sonnet 5.5'))
+  expect(emphasis()).toMatchObject({ 'Claude Code': 'neighbor', OpenRouter: 'neighbor', 'Anthropic API': 'dim' })
+
+  await user.unhover(card('Claude Sonnet 5.5'))
+  expect(Object.values(emphasis()).every((e) => e === '')).toBe(true)
+})
+
+test('drawer shows relations with summaries; adding one from the provider side shows on the model', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: 'Claude Sonnet 5.5' }))
+  const s = within(sheet())
+  const harnessGroup = within(await s.findByRole('group', { name: '关联的 Harness' }))
+  expect(harnessGroup.getByText('Claude Code')).toBeInTheDocument()
+  expect(harnessGroup.getByText('默认')).toBeInTheDocument()
+  const providerGroup = within(s.getByRole('group', { name: '关联的 Provider' }))
+  expect(providerGroup.getByText('$3 / $15')).toBeInTheDocument()
+  // A model links to harnesses and providers, never to other models.
+  expect(s.queryByRole('group', { name: '关联的 Model' })).toBeNull()
+  await user.click(s.getByRole('button', { name: '取消' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+  // Link Sonnet from the Anthropic API side.
+  await user.click(card('Anthropic API'))
+  const p = within(sheet())
+  const models = within(await p.findByRole('group', { name: '关联的 Model' }))
+  await user.click(models.getByRole('button', { name: /添加 Model/ }))
+  await user.click(await screen.findByRole('option', { name: 'Claude Sonnet 5.5' }))
+  await user.click(p.getByRole('button', { name: /^Claude Sonnet 5.5/ }))
+  await user.type(await screen.findByLabelText('输入价格'), '3')
+  await user.click(p.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+  const put = requests.find((r) => r.method === 'PUT')!
+  expect(put.body).toEqual({
+    links: [{ targetId: items.find((i) => i.name === 'Claude Sonnet 5.5')!.id, attrs: { input_price: 3 } }],
+  })
+  expect(requests.some((r) => r.method === 'PATCH')).toBe(false) // item fields unchanged
+
+  // Open the model again: the new relation shows up from the other end.
+  await user.click(card('Claude Sonnet 5.5'))
+  const again = within(await within(sheet()).findByRole('group', { name: '关联的 Provider' }))
+  expect(again.getByText('Anthropic API')).toBeInTheDocument()
+})
+
+test('removing a relation sends the remaining set; untouched relations carry no attrs', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: 'Claude Sonnet 5.5' }))
+  const s = within(sheet())
+  await user.click(await s.findByRole('button', { name: '解除与 OpenRouter 的关联' }))
+  await user.click(s.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  const put = requests.find((r) => r.method === 'PUT')!
+  expect(put.body).toEqual({ links: [{ targetId: items.find((i) => i.name === 'Claude Code')!.id }] })
+  expect(relations.map((r) => r.id)).toEqual(['r1'])
+})
+
+test('relation save failure keeps the drawer open; retry resends only relations', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: '新增 Harness' }))
+  const s = within(sheet())
+  await user.type(s.getByLabelText(/名称/), 'Cursor')
+  const models = within(s.getByRole('group', { name: '关联的 Model' }))
+  await user.click(models.getByRole('button', { name: /添加 Model/ }))
+  await user.click(await screen.findByRole('option', { name: 'Claude Sonnet 5.5' }))
+
+  failNextPut = true
+  await user.click(s.getByRole('button', { name: '保存' }))
+  expect(await s.findByText(/条目已保存，关联保存失败/)).toBeInTheDocument()
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+  await user.click(s.getByRole('button', { name: '保存' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  const writes = requests.filter((r) => r.method !== 'GET').map((r) => r.method)
+  expect(writes).toEqual(['POST', 'PUT', 'PUT']) // no second POST
+  const cursor = items.find((i) => i.name === 'Cursor')!
+  expect(relations.some((r) => r.fromId === cursor.id && r.type === 'uses')).toBe(true)
 })

@@ -1,7 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api } from './client'
-import type { BoardView, CreateItemInput, ItemPatch } from './types'
+import type { BoardView, CreateItemInput, ItemPatch, RelationLink } from './types'
 
 export const queryKeys = {
   kinds: ['kinds'] as const,
@@ -53,6 +53,18 @@ export function useUpdateItem(boardKey: string) {
   return useMutation({
     mutationFn: ({ id, patch }: { id: string; patch: ItemPatch }) => api.updateItem(id, patch),
     onSuccess: (_, { id }) => invalidate(id),
+  })
+}
+
+export function useReplaceRelations(boardKey: string) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, links }: { id: string; links: RelationLink[] }) => api.replaceRelations(id, links),
+    // Both ends change, so refresh every cached item detail as well as the board.
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.boardAll(boardKey) })
+      qc.invalidateQueries({ queryKey: ['item'] })
+    },
   })
 }
 
