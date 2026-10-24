@@ -47,6 +47,10 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 20. Relation mode starts from a card's 编辑关联… menu item. Cards in related columns become checkboxes, and every toggle immediately PUTs the source's full link set with no attrs, so existing attrs are kept. Esc or 完成 leaves the mode.
 21. Screens narrower than 900px show the columns as tabs (`useMediaQuery`).
 
+## Later changes
+
+22. A card is a single row. Tags are right-aligned in that row (`TagStrip.tsx`) and take at most 30% of its width. Tags that don't fit collapse into `+N`. An invisible copy of the tags is measured, `lib/fitTags.ts` computes how many fit, and the count is recomputed when the row resizes. The summary, the `ShowOnCard` fields (each with its label) and all tags are in a details popover (`CardDetails.tsx`). It opens when you hover its info button, not the card, and clicking the button pins it open. The button is hidden when there is nothing to show. Clicks on the button or inside the popup are stopped, because React bubbles them through the portal to the card.
+
 ## Implementation notes
 
 - Domain errors live in `internal/apperr`. Services return them, and `httpx.WriteError` maps them to HTTP status codes, so services never import `httpx`.

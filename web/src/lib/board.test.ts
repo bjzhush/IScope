@@ -1,6 +1,6 @@
 import type { Field, Item } from '@/api/types'
 import { matchesFilter } from './filter'
-import { cardMeta, formatFieldValue } from './format'
+import { cardDetails, formatFieldValue } from './format'
 import { compareItems } from './sort'
 
 const mk = (over: Partial<Item>): Item => ({
@@ -28,14 +28,18 @@ test('compareItems: pinned, then status, then sortOrder', () => {
   expect(items.sort(compareItems).map((i) => i.id)).toEqual(['d', 'e', 'b', 'a', 'c'])
 })
 
-test('formatFieldValue and cardMeta follow field types', () => {
+test('formatFieldValue and cardDetails follow field types', () => {
   expect(formatFieldValue(fields[0], 'desktop')).toBe('桌面')
   expect(formatFieldValue(fields[1], true)).toBe('开源')
   expect(formatFieldValue(fields[1], false)).toBeNull()
   expect(formatFieldValue(fields[2], 200000)).toBe('200,000 tokens')
   const it = mk({ attrs: { form: 'desktop', open_source: true, ctx: 1000, vendor: 'X' } })
-  expect(cardMeta(fields, it)).toEqual(['桌面', '开源', '1,000 tokens'])
-  expect(cardMeta(fields, mk({ attrs: { open_source: false } }))).toEqual([])
+  expect(cardDetails(fields, it)).toEqual([
+    { label: '形态', value: '桌面' },
+    { label: '开源', value: '是' },
+    { label: '上下文', value: '1,000 tokens' },
+  ])
+  expect(cardDetails(fields, mk({ attrs: { open_source: false } }))).toEqual([])
 })
 
 describe('matchesFilter', () => {

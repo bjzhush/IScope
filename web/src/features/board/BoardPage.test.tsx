@@ -196,12 +196,11 @@ test('renders columns in board order with cards built from field definitions', a
   expect(regions).toEqual(['Harness', 'Model', 'Provider'])
 
   const cc = within(card('Claude Code'))
-  expect(cc.getByText('终端 agent')).toBeInTheDocument()
-  expect(cc.getByText('CLI')).toBeInTheDocument() // select label, open_source=false hidden
-  expect(cc.getByText('+1')).toBeInTheDocument() // 4 tags, 3 shown
-  expect(within(card('OpenCode')).getByText('CLI · 开源')).toBeInTheDocument()
-  expect(within(card('Claude Sonnet 5.5')).getByText('Anthropic · 1,000,000 tokens')).toBeInTheDocument()
-  expect(within(card('OpenRouter')).getByText('聚合 · openai / anthropic')).toBeInTheDocument()
+  // jsdom has no layout, so every tag shows; TagStrip.test covers the cut.
+  expect(cc.getAllByText('daily')).toHaveLength(2) // visible + measuring copy
+  // Summary and fields live in the details popover, not on the card.
+  expect(cc.queryByText('终端 agent')).toBeNull()
+  expect(cc.getByRole('button', { name: 'Claude Code 详情' })).toBeInTheDocument()
 
   // Pinned + in_use first.
   const harness = within(column('Harness')).getAllByRole('button', { name: /^(Claude Code|OpenCode)$/ })
@@ -360,6 +359,59 @@ test('card menu: archive, restore, pin and delete with confirmation', async () =
     ['PATCH', { status: 'watching' }],
     ['DELETE', undefined],
   ])
+})
+
+test('details popover opens on hovering its button and shows summary and labelled fields', async () => {
+  // While hover-open, Base UI sets pointer-events: none on the body and auto on
+  // the popup; jsdom does not inherit computed styles, so skip user-event's check.
+  const user = userEvent.setup({ pointerEventsCheck: 0 })
+  renderPage()
+  await screen.findByText('AI 技术栈')
+
+  // Hovering the card itself shows nothing.
+  await user.hover(card('Claude Code'))
+  await new Promise((r) => setTimeout(r, 300))
+  expect(screen.queryByText('终端 agent')).toBeNull()
+
+  await user.hover(screen.getByRole('button', { name: 'Claude Code 详情' }))
+  const popup = await screen.findByRole('dialog')
+  expect(within(popup).getByText('终端 agent')).toBeInTheDocument()
+  expect(within(popup).getByText('形态')).toBeInTheDocument()
+  expect(within(popup).getByText('CLI')).toBeInTheDocument()
+  expect(within(popup).queryByText('开源')).toBeNull() // open_source=false hidden
+  expect(within(popup).getByText('coding')).toBeInTheDocument() // all tags
+
+  await user.unhover(screen.getByRole('button', { name: 'Claude Code 详情' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+
+  // A click pins it open; clicks on the button or inside the popup never open
+  // the drawer.
+  const noDrawer = async () => {
+    await new Promise((r) => setTimeout(r, 100))
+    expect(screen.queryByText('编辑 Claude Code')).toBeNull()
+  }
+  await user.click(screen.getByRole('button', { name: 'Claude Code 详情' }))
+  await noDrawer()
+  await user.click(within(await screen.findByRole('dialog')).getByText('终端 agent'))
+  await noDrawer()
+  expect(screen.getByRole('dialog')).toBeInTheDocument()
+})
+
+test('details popover formats each field type', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  const open = async (name: string) => {
+    await user.click(screen.getByRole('button', { name: `${name} 详情` }))
+    const popup = await screen.findByRole('dialog')
+    const text = popup.textContent
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    return text
+  }
+  expect(await open('OpenCode')).toBe('形态CLI开源是')
+  expect(await open('Claude Sonnet 5.5')).toBe('出品方Anthropic上下文窗口1,000,000 tokens')
+  expect(await open('OpenRouter')).toBe('类型聚合兼容协议openai / anthropic')
 })
 
 test('hovering a card highlights direct neighbours and dims the rest', async () => {

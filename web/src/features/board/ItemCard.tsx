@@ -3,12 +3,11 @@ import type { Field, Item } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
-import { cardMeta } from '@/lib/format'
 import { statusBadgeClass, statusLabel } from '@/lib/status'
 import type { ItemActions } from './actions'
+import { CardDetails } from './CardDetails'
 import { ItemMenu } from './ItemMenu'
-
-const MAX_TAGS = 3
+import { TagStrip } from './TagStrip'
 
 // Hover linking: the hovered card, its direct neighbours, and everything else.
 export type Emphasis = 'focus' | 'neighbor' | 'dim' | undefined
@@ -37,8 +36,6 @@ export interface ItemCardProps {
 
 export function ItemCard(props: ItemCardProps) {
   const { item, fields, actions, emphasis, onHover, select, linking, ref, style, dragging, dragHandleProps } = props
-  const meta = cardMeta(fields, item)
-  const extraTags = item.tags.length - MAX_TAGS
   const activate = () => {
     if (select) select.onToggle()
     else if (!linking) actions.edit(item)
@@ -63,7 +60,7 @@ export function ItemCard(props: ItemCardProps) {
         }
       }}
       className={cn(
-        'group relative cursor-pointer rounded-lg border bg-card p-3 text-left shadow-xs transition-[opacity,border-color] outline-none hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring',
+        'group relative cursor-pointer rounded-lg border bg-card px-3 py-2 text-left shadow-xs transition-[opacity,border-color] outline-none hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring',
         emphasis === 'dim' ? 'opacity-30' : item.status === 'archived' && 'opacity-60',
         emphasis === 'neighbor' && 'border-primary ring-1 ring-primary',
         emphasis === 'focus' && linking && 'border-primary ring-2 ring-primary',
@@ -86,26 +83,12 @@ export function ItemCard(props: ItemCardProps) {
           </button>
         )}
         <h3 className="min-w-0 flex-1 truncate font-medium">{item.name}</h3>
+        <TagStrip tags={item.tags} />
+        <CardDetails item={item} fields={fields} />
         {item.pinned && <Pin aria-label="已置顶" className="size-3.5 shrink-0 text-muted-foreground" />}
         <Badge className={cn('shrink-0', statusBadgeClass[item.status])}>{statusLabel(item.status)}</Badge>
         {!linking && <ItemMenu item={item} actions={actions} />}
       </div>
-      {item.summary && <p className="mt-1 truncate text-sm text-muted-foreground">{item.summary}</p>}
-      {meta.length > 0 && <p className="mt-1 truncate text-xs text-muted-foreground">{meta.join(' · ')}</p>}
-      {item.tags.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1">
-          {item.tags.slice(0, MAX_TAGS).map((t) => (
-            <Badge key={t} variant="outline" className="font-normal">
-              {t}
-            </Badge>
-          ))}
-          {extraTags > 0 && (
-            <Badge variant="outline" className="font-normal text-muted-foreground">
-              +{extraTags}
-            </Badge>
-          )}
-        </div>
-      )}
     </article>
   )
 }
