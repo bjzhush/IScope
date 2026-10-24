@@ -15,6 +15,25 @@ export function buildAdjacency(relations: Relation[]): Map<string, Set<string>> 
   return adj
 }
 
+// Focus mode: direct neighbours (layer 1) and their neighbours (layer 2). The
+// second hop never lands in the focused item's own kind, so the chain runs
+// outward across columns instead of back to the focused item's siblings.
+export function focusLayers(
+  adj: Map<string, Set<string>>,
+  focusId: string,
+  kindOf: (id: string) => string | undefined,
+): Map<string, 1 | 2> {
+  const layers = new Map<string, 1 | 2>()
+  for (const id of adj.get(focusId) ?? []) layers.set(id, 1)
+  const own = kindOf(focusId)
+  for (const id of [...layers.keys()]) {
+    for (const next of adj.get(id) ?? []) {
+      if (next !== focusId && !layers.has(next) && kindOf(next) !== own) layers.set(next, 2)
+    }
+  }
+  return layers
+}
+
 // The relation type linking two kinds, in either direction.
 export function relationTypeBetween(types: RelationType[], a: string, b: string): RelationType | undefined {
   return types.find((t) => (t.fromKind === a && t.toKind === b) || (t.fromKind === b && t.toKind === a))

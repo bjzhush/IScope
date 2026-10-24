@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CatalogDialog } from '@/features/catalog/CatalogDialog'
 import { ItemSheet } from '@/features/editor/ItemSheet'
 import { matchesFilter } from '@/lib/filter'
-import { buildAdjacency, otherEnd, relationTypeBetween } from '@/lib/relations'
+import { buildAdjacency, focusLayers, otherEnd, relationTypeBetween } from '@/lib/relations'
 import { compareItems } from '@/lib/sort'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import type { ItemActions } from './actions'
@@ -40,29 +40,54 @@ export function BoardPage() {
     [kinds.data],
   )
 
+  // Focus mode (?focus=<id>): null once the item is deleted or hidden.
+  const focusItem = board.data?.items.find((it) => it.id === f.focusId) ?? null
+  const layers = useMemo(() => {
+    if (!focusItem || !board.data) return null
+    const kindOf = new Map(board.data.items.map((it) => [it.id, it.kind]))
+    return focusLayers(adjacency, focusItem.id, (id) => kindOf.get(id))
+  }, [focusItem, board.data, adjacency])
+
   const columns = useMemo(() => {
     const view = board.data
     if (!view) return []
     return view.board.columns.flatMap((col) => {
       const kind = kindByKey.get(col)
       if (!kind) return []
-      const items = view.items
+      let items = view.items
         .filter((it) => it.kind === col && matchesFilter(it, kind.fields, f.filter))
         .sort(compareItems)
+      // Focus mode: other columns keep only related items, direct ones first.
+      if (focusItem && layers && col !== focusItem.kind) {
+        items = items.filter((it) => layers.has(it.id)).sort((a, b) => layers.get(a.id)! - layers.get(b.id)!)
+      }
       return [{ kind, items }]
     })
-  }, [board.data, kindByKey, f.filter])
+  }, [board.data, kindByKey, f.filter, focusItem, layers])
 
-  // Relation mode: the source item (null once it is deleted or hidden); Esc exits.
+  // Relation mode: the source item (null once it is deleted or hidden).
   const linkSource = board.data?.items.find((it) => it.id === linkSourceId) ?? null
+
+  // Esc leaves relation or focus mode. An open drawer or dialog swallows Esc
+  // itself, so closing one never ends the mode as well.
+  const { setFocus } = f
+  const inMode = !!linkSourceId || !!f.focusId
   useEffect(() => {
-    if (!linkSourceId) return
+    if (!inMode) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setLinkSourceId(null)
+      if (e.key !== 'Escape') return
+      setLinkSourceId(null)
+      setFocus(null)
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [linkSourceId])
+  }, [inMode, setFocus])
+
+  // Entering focus mode brings the focused card into view.
+  const focusId = focusItem?.id
+  useEffect(() => {
+    if (focusId) document.querySelector(`[data-item-id="${focusId}"]`)?.scrollIntoView({ block: 'nearest' })
+  }, [focusId])
 
   const relationTypes = kinds.data?.relationTypes ?? []
   const relatable = (a: string, b: string) => a !== b && !!relationTypeBetween(relationTypes, a, b)
@@ -99,11 +124,17 @@ export function BoardPage() {
   }
 
   // A card can vanish under the pointer (deleted, filtered) without mouseleave.
-  const hoverActive = !linkSource && hovered !== null && columns.some((c) => c.items.some((it) => it.id === hovered))
+  const hoverActive =
+    !linkSource && !focusItem && hovered !== null && columns.some((c) => c.items.some((it) => it.id === hovered))
   const emphasis = (item: Item) => {
     if (linkSource) {
-      if (item.id === linkSource.id) return 'focus'
+      if (item.id === linkSource.id) return 'selected'
       return relatable(linkSource.kind, item.kind) ? undefined : 'dim'
+    }
+    if (focusItem && layers) {
+      if (item.id === focusItem.id) return 'selected'
+      const layer = layers.get(item.id)
+      return layer === 1 ? 'neighbor' : layer === 2 ? 'indirect' : 'dim'
     }
     if (!hoverActive || !hovered) return undefined
     if (item.id === hovered) return 'focus'
@@ -115,7 +146,14 @@ export function BoardPage() {
     setStatus: (it, status) => quick.mutate({ id: it.id, patch: { status } }),
     togglePin: (it) => quick.mutate({ id: it.id, patch: { pinned: !it.pinned } }),
     remove: (it) => del.mutate(it.id),
-    link: (it) => setLinkSourceId(it.id),
+    link: (it) => {
+      f.setFocus(null)
+      setLinkSourceId(it.id)
+    },
+    focus: (it) => {
+      setLinkSourceId(null)
+      f.setFocus(it.id)
+    },
   }
 
   const error = kinds.error ?? board.error
@@ -127,6 +165,7 @@ export function BoardPage() {
   }
 
   const filtered = f.filter.q.trim() !== '' || f.filter.status !== ''
+  const hoveredNeighbors = hoverActive && hovered ? (adjacency.get(hovered) ?? null) : null
   const renderColumn = ({ kind, items }: (typeof columns)[number]) => (
     <Column
       key={kind.key}
@@ -139,6 +178,9 @@ export function BoardPage() {
       onHover={setHovered}
       onMove={(id, plan) => move.mutate({ id, input: plan.input, sortOrder: plan.sortOrder })}
       linking={linking(kind)}
+      sortable={!linkSource && !focusItem}
+      emptyText={focusItem && kind.key !== focusItem.kind ? `没有与 ${focusItem.name} 关联的 ${kind.label}` : undefined}
+      hintTargets={hovered && items.some((it) => it.id === hovered) ? null : hoveredNeighbors}
     />
   )
   const activeTab = tab ?? columns[0]?.kind.key
@@ -160,6 +202,16 @@ export function BoardPage() {
           </span>
           <Button size="sm" onClick={() => setLinkSourceId(null)}>
             <X /> 完成
+          </Button>
+        </div>
+      )}
+      {focusItem && (
+        <div role="status" aria-label="聚焦模式" className="flex items-center gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
+          <span className="min-w-0 flex-1">
+            聚焦：<strong>{focusItem.name}</strong>。其他列只显示与它关联的条目，实线框为直接关联，虚线框为间接关联。按 Esc 退出。
+          </span>
+          <Button size="sm" onClick={() => f.setFocus(null)}>
+            <X /> 退出
           </Button>
         </div>
       )}

@@ -437,6 +437,76 @@ test('hovering a card highlights direct neighbours and dims the rest', async () 
   expect(Object.values(emphasis()).every((e) => e === '')).toBe(true)
 })
 
+test('hovering counts neighbours scrolled out of view at the column edges', async () => {
+  // Fake layout: every scroll area spans 0–100px; cards sit where `tops` says.
+  const tops: Record<string, number> = { 'Claude Code': -100, 'Claude Sonnet 5.5': 300, OpenRouter: 50 }
+  vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const name = this.getAttribute('aria-label') ?? ''
+    if (this.hasAttribute('data-item-id')) {
+      const top = tops[name] ?? 0
+      return { top, bottom: top + 40, height: 40 } as DOMRect
+    }
+    if (this.classList.contains('overflow-y-auto')) return { top: 0, bottom: 100, height: 100 } as DOMRect
+    return { top: 0, bottom: 0, height: 0 } as DOMRect
+  })
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+
+  await user.hover(card('Claude Code'))
+  expect(within(column('Model')).getByText('下方还有 1 个关联')).toBeInTheDocument()
+  expect(within(column('Harness')).queryByText(/还有/)).toBeNull() // the hovered card's own column
+
+  await user.hover(card('Claude Sonnet 5.5'))
+  expect(within(column('Harness')).getByText('上方还有 1 个关联')).toBeInTheDocument()
+  expect(within(column('Provider')).queryByText(/还有/)).toBeNull() // OpenRouter is in view
+  expect(within(column('Model')).queryByText(/还有/)).toBeNull()
+
+  await user.unhover(card('Claude Sonnet 5.5'))
+  expect(screen.queryByText(/还有 \d+ 个关联/)).toBeNull()
+  vi.restoreAllMocks()
+})
+
+test('focus mode: other columns keep direct and second-hop items; Esc closes a drawer first', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: 'Claude Code 菜单' }))
+  await user.click(await screen.findByRole('menuitem', { name: '聚焦关联' }))
+
+  expect(screen.getByRole('status', { name: '聚焦模式' })).toHaveTextContent('Claude Code')
+  expect(location).toContain(`focus=${items[0].id}`)
+  const names = (label: string) =>
+    Array.from(column(label).querySelectorAll<HTMLElement>('article')).map((el) => [el.getAttribute('aria-label'), el.dataset.emphasis])
+  // Own column stays complete; Sonnet is direct; OpenRouter offers Sonnet; Anthropic API is unrelated.
+  expect(names('Harness')).toEqual([['Claude Code', 'selected'], ['OpenCode', 'dim']])
+  expect(names('Model')).toEqual([['Claude Sonnet 5.5', 'neighbor']])
+  expect(names('Provider')).toEqual([['OpenRouter', 'indirect']])
+
+  // Hover linking is off while focused.
+  await user.hover(card('OpenCode'))
+  expect(card('Claude Sonnet 5.5').dataset.emphasis).toBe('neighbor')
+
+  // Esc closes the drawer but keeps focus mode; a second Esc leaves it.
+  await user.click(card('Claude Sonnet 5.5'))
+  await screen.findByText('编辑 Claude Sonnet 5.5')
+  await user.keyboard('{Escape}')
+  await waitFor(() => expect(screen.queryByText('编辑 Claude Sonnet 5.5')).toBeNull())
+  expect(screen.getByRole('status', { name: '聚焦模式' })).toBeInTheDocument()
+  await user.keyboard('{Escape}')
+  expect(screen.queryByRole('status', { name: '聚焦模式' })).toBeNull()
+  expect(location).not.toContain('focus=')
+  expect(card('Anthropic API')).toBeInTheDocument()
+})
+
+test('focus mode survives a reload and explains empty columns', async () => {
+  const id = items.find((i) => i.name === 'Anthropic API')!.id
+  renderPage(`/boards/ai-stack?focus=${id}`)
+  expect(await screen.findByRole('status', { name: '聚焦模式' })).toHaveTextContent('Anthropic API')
+  expect(within(column('Model')).getByText('没有与 Anthropic API 关联的 Model')).toBeInTheDocument()
+  expect(within(column('Harness')).getByText('没有与 Anthropic API 关联的 Harness')).toBeInTheDocument()
+  expect(card('OpenRouter').dataset.emphasis).toBe('dim')
+})
+
 test('drawer shows relations with summaries; adding one from the provider side shows on the model', async () => {
   const user = userEvent.setup()
   renderPage()

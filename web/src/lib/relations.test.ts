@@ -1,6 +1,6 @@
 import type { Field, Relation, RelationType } from '@/api/types'
 import { draftsFromRelations, newDraft, relationsPayload } from '@/features/editor/relationDrafts'
-import { buildAdjacency, relationSummary, relationTypeBetween } from './relations'
+import { buildAdjacency, focusLayers, relationSummary, relationTypeBetween } from './relations'
 
 const rel = (id: string, fromId: string, toId: string, type = 'offered_by', attrs = {}): Relation => ({
   id, type, fromId, toId, attrs, createdAt: '', updatedAt: '',
@@ -24,6 +24,24 @@ test('buildAdjacency links both directions', () => {
   expect([...adj.get('m')!].sort()).toEqual(['h', 'p'])
   expect([...adj.get('p')!]).toEqual(['m'])
   expect(adj.get('x')).toBeUndefined()
+})
+
+test('focusLayers: direct neighbours, then one more hop outward', () => {
+  // Harnesses h1 h2, models m1 m2, providers p1 p2.
+  // h1 uses m1; h2 uses m1 and m2; m1 offered by p1; m2 offered by p2.
+  const adj = buildAdjacency([
+    rel('1', 'h1', 'm1', 'uses'), rel('2', 'h2', 'm1', 'uses'), rel('3', 'h2', 'm2', 'uses'),
+    rel('4', 'm1', 'p1'), rel('5', 'm2', 'p2'),
+  ])
+  const kindOf = (id: string) => ({ h: 'harness', m: 'model', p: 'provider' })[id[0]]
+  const layers = (id: string) => Object.fromEntries(focusLayers(adj, id, kindOf))
+
+  // h2 shares m1 but is a harness like h1, so it is not pulled in.
+  expect(layers('h1')).toEqual({ m1: 1, p1: 2 })
+  // From a model both sides are direct; their other models are the focus's kind.
+  expect(layers('m1')).toEqual({ h1: 1, h2: 1, p1: 1 })
+  expect(layers('p2')).toEqual({ m2: 1, h2: 2 })
+  expect(layers('lonely')).toEqual({})
 })
 
 test('relationTypeBetween works from either end', () => {

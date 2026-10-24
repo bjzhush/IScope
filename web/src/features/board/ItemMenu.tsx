@@ -56,6 +56,7 @@ export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
               <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => actions.setStatus(item, 'archived')}>弃用</DropdownMenuItem>
             </>

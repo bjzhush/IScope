@@ -10,7 +10,9 @@ import { ItemMenu } from './ItemMenu'
 import { TagStrip } from './TagStrip'
 
 // Hover linking: the hovered card, its direct neighbours, and everything else.
-export type Emphasis = 'focus' | 'neighbor' | 'dim' | undefined
+// Relation and focus mode mark their source as selected; focus mode also shows
+// second-hop items as indirect.
+export type Emphasis = 'focus' | 'selected' | 'neighbor' | 'indirect' | 'dim' | undefined
 
 // In relation mode a card of a relatable column is a checkbox.
 export interface Selectable {
@@ -50,6 +52,7 @@ export function ItemCard(props: ItemCardProps) {
       tabIndex={linking && !select ? -1 : 0}
       aria-label={item.name}
       data-emphasis={emphasis}
+      data-item-id={item.id}
       onClick={activate}
       onMouseEnter={() => onHover?.(item.id)}
       onMouseLeave={() => onHover?.(null)}
@@ -63,7 +66,8 @@ export function ItemCard(props: ItemCardProps) {
         'group relative cursor-pointer rounded-lg border bg-card px-3 py-2 text-left shadow-xs transition-[opacity,border-color] outline-none hover:border-foreground/30 focus-visible:ring-2 focus-visible:ring-ring',
         emphasis === 'dim' ? 'opacity-30' : item.status === 'archived' && 'opacity-60',
         emphasis === 'neighbor' && 'border-primary ring-1 ring-primary',
-        emphasis === 'focus' && linking && 'border-primary ring-2 ring-primary',
+        emphasis === 'selected' && 'border-primary ring-2 ring-primary',
+        emphasis === 'indirect' && 'border-dashed border-primary/70',
         select?.checked && 'border-primary bg-primary/5',
         linking && !select && 'cursor-default',
         dragging && 'z-10 opacity-80 shadow-lg',

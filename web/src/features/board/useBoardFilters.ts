@@ -6,7 +6,7 @@ import type { BoardFilter } from '@/lib/filter'
 const isFilterStatus = (s: string | null): s is Status => s === 'in_use' || s === 'watching'
 
 // Board filters and the open drawer live in the URL so a reload keeps them:
-// ?q=&status=in_use|watching&archived=1&item=<id>|new=<kind>
+// ?q=&status=in_use|watching&archived=1&focus=<id>&item=<id>|new=<kind>
 export function useBoardFilters() {
   const [params, setParams] = useSearchParams()
 
@@ -40,6 +40,8 @@ export function useBoardFilters() {
     setQuery: (q: string) => update({ q }),
     setStatus: (s: Status | '') => update({ status: s }),
     setShowArchived: (on: boolean) => update({ archived: on ? '1' : null }),
+    focusId: params.get('focus'),
+    setFocus: (id: string | null) => update({ focus: id }),
     editingId: params.get('item'),
     newKind: params.get('new'),
     openItem: (id: string) => update({ item: id, new: null }),
