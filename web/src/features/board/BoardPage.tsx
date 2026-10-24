@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useParams } from 'react-router'
 import { useBoard, useDeleteItem, useKinds, useMoveItem, useQuickUpdate, useSetLinks } from '@/api/queries'
 import type { Item, Kind, Relation } from '@/api/types'
@@ -18,6 +18,22 @@ import type { Selectable } from './ItemCard'
 import { Toolbar } from './Toolbar'
 import { useBoardFilters } from './useBoardFilters'
 
+// Hover linking only follows the pointer once it rests this long, so sweeping
+// across cards does not flash highlights. Leaving waits too, so moving from one
+// card to the next switches highlights directly instead of clearing in between.
+const HOVER_DELAY = 150
+
+function useSettledHover() {
+  const [hovered, setHovered] = useState<string | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const onHover = useCallback((id: string | null) => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(() => setHovered(id), HOVER_DELAY)
+  }, [])
+  useEffect(() => () => clearTimeout(timer.current), [])
+  return [hovered, onHover] as const
+}
+
 export function BoardPage() {
   const { key = '' } = useParams()
   const f = useBoardFilters()
@@ -30,7 +46,7 @@ export function BoardPage() {
   const narrow = useMediaQuery('(max-width: 899px)')
   const [tab, setTab] = useState<string | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
-  const [hovered, setHovered] = useState<string | null>(null)
+  const [hovered, setHovered] = useSettledHover()
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
 
   const relations = board.data?.relations

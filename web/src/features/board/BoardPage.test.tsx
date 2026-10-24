@@ -425,16 +425,38 @@ test('hovering a card highlights direct neighbours and dims the rest', async () 
 
   await user.hover(card('Claude Code'))
   // Only one hop: Sonnet is linked, OpenRouter (Sonnet's provider) is not.
-  expect(emphasis()).toEqual({
-    'Claude Code': 'focus', OpenCode: 'dim', 'Claude Sonnet 5.5': 'neighbor', OpenRouter: 'dim', 'Anthropic API': 'dim',
-  })
+  await waitFor(() =>
+    expect(emphasis()).toEqual({
+      'Claude Code': 'focus', OpenCode: 'dim', 'Claude Sonnet 5.5': 'neighbor', OpenRouter: 'dim', 'Anthropic API': 'dim',
+    }),
+  )
   expect(card('OpenCode').className).toContain('opacity-30')
 
   await user.hover(card('Claude Sonnet 5.5'))
-  expect(emphasis()).toMatchObject({ 'Claude Code': 'neighbor', OpenRouter: 'neighbor', 'Anthropic API': 'dim' })
+  await waitFor(() =>
+    expect(emphasis()).toMatchObject({ 'Claude Code': 'neighbor', OpenRouter: 'neighbor', 'Anthropic API': 'dim' }),
+  )
 
   await user.unhover(card('Claude Sonnet 5.5'))
-  expect(Object.values(emphasis()).every((e) => e === '')).toBe(true)
+  await waitFor(() => expect(Object.values(emphasis()).every((e) => e === '')).toBe(true))
+})
+
+test('sweeping across cards only highlights where the pointer rests', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  const focused = () => screen.queryAllByRole('button').find((el) => el.dataset.emphasis === 'focus')?.getAttribute('aria-label')
+
+  // Passing over Claude Code on the way to OpenCode highlights nothing yet.
+  await user.hover(card('Claude Code'))
+  await user.hover(card('OpenCode'))
+  expect(focused()).toBeUndefined()
+  await waitFor(() => expect(focused()).toBe('OpenCode'))
+
+  // Moving on keeps the current highlight until the next one settles.
+  await user.hover(card('Claude Sonnet 5.5'))
+  expect(focused()).toBe('OpenCode')
+  await waitFor(() => expect(focused()).toBe('Claude Sonnet 5.5'))
 })
 
 test('hovering counts neighbours scrolled out of view at the column edges', async () => {
@@ -454,16 +476,16 @@ test('hovering counts neighbours scrolled out of view at the column edges', asyn
   await screen.findByText('AI 技术栈')
 
   await user.hover(card('Claude Code'))
-  expect(within(column('Model')).getByText('下方还有 1 个关联')).toBeInTheDocument()
+  expect(await within(column('Model')).findByText('下方还有 1 个关联')).toBeInTheDocument()
   expect(within(column('Harness')).queryByText(/还有/)).toBeNull() // the hovered card's own column
 
   await user.hover(card('Claude Sonnet 5.5'))
-  expect(within(column('Harness')).getByText('上方还有 1 个关联')).toBeInTheDocument()
+  expect(await within(column('Harness')).findByText('上方还有 1 个关联')).toBeInTheDocument()
   expect(within(column('Provider')).queryByText(/还有/)).toBeNull() // OpenRouter is in view
   expect(within(column('Model')).queryByText(/还有/)).toBeNull()
 
   await user.unhover(card('Claude Sonnet 5.5'))
-  expect(screen.queryByText(/还有 \d+ 个关联/)).toBeNull()
+  await waitFor(() => expect(screen.queryByText(/还有 \d+ 个关联/)).toBeNull())
   vi.restoreAllMocks()
 })
 
