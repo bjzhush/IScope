@@ -1,23 +1,20 @@
 import { useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router'
 import type { Status } from '@/api/types'
-import type { BoardFilter } from '@/lib/filter'
-
-const isFilterStatus = (s: string | null): s is Status => s === 'in_use' || s === 'watching'
+import { type BoardFilter, formatStatuses, parseStatuses } from '@/lib/filter'
 
 // Board filters and the open drawer live in the URL so a reload keeps them:
-// ?q=&status=in_use|watching&archived=1&focus=<id>&item=<id>|new=<kind>
+// ?q=&status=<comma-separated statuses>&focus=<id>&item=<id>|new=<kind>
 export function useBoardFilters() {
   const [params, setParams] = useSearchParams()
 
-  const filter: BoardFilter = useMemo(() => {
-    const status = params.get('status')
-    return {
+  const filter: BoardFilter = useMemo(
+    () => ({
       q: params.get('q') ?? '',
-      status: isFilterStatus(status) ? status : '',
-      showArchived: params.get('archived') === '1',
-    }
-  }, [params])
+      statuses: parseStatuses(params.get('status'), params.get('archived') === '1'),
+    }),
+    [params],
+  )
 
   const update = useCallback(
     (changes: Record<string, string | null>) =>
@@ -38,8 +35,7 @@ export function useBoardFilters() {
   return {
     filter,
     setQuery: (q: string) => update({ q }),
-    setStatus: (s: Status | '') => update({ status: s }),
-    setShowArchived: (on: boolean) => update({ archived: on ? '1' : null }),
+    setStatuses: (s: Status[]) => update({ status: formatStatuses(s), archived: null }),
     focusId: params.get('focus'),
     setFocus: (id: string | null) => update({ focus: id }),
     editingId: params.get('item'),

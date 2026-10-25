@@ -209,37 +209,95 @@ test('renders columns in board order with cards built from field definitions', a
   expect(screen.queryByRole('button', { name: 'Aider' })).toBeNull()
 })
 
-test('search, status filter and archived toggle update the URL and survive a reload', async () => {
+test('status toggles: multi-select with counts, at least one stays on, URL survives a reload', async () => {
   const user = userEvent.setup()
   const { unmount } = renderPage()
   await screen.findByText('AI 技术栈')
+  const toggle = (label: string) => screen.getByRole('button', { name: new RegExp(`^${label}\\s*\\d+$`) })
+  const pressed = () =>
+    ['使用中', '关注中', '已弃用'].filter((l) => toggle(l).getAttribute('aria-pressed') === 'true')
 
+  // Default: in use + watching; counts include the hidden archived item.
+  expect(pressed()).toEqual(['使用中', '关注中'])
+  expect([toggle('使用中'), toggle('关注中'), toggle('已弃用')].map((b) => b.textContent)).toEqual([
+    '使用中2', '关注中3', '已弃用1',
+  ])
+  expect(screen.queryByRole('button', { name: 'Aider' })).toBeNull()
+  expect(screen.queryByRole('switch')).toBeNull()
+
+  // Counts follow the search.
   await user.type(screen.getByLabelText('搜索'), '聚合') // matches a select option label
   expect(screen.queryByRole('button', { name: 'Claude Code' })).toBeNull()
   expect(card('OpenRouter')).toBeInTheDocument()
   expect(within(column('Harness')).getByText('没有符合筛选条件的 Harness')).toBeInTheDocument()
+  expect(toggle('使用中').textContent).toBe('使用中0')
+  expect(toggle('关注中').textContent).toBe('关注中1')
   await user.clear(screen.getByLabelText('搜索'))
 
-  await user.click(screen.getByRole('button', { name: '使用中' }))
+  await user.click(toggle('关注中'))
   expect(screen.queryByRole('button', { name: 'OpenCode' })).toBeNull()
   expect(card('Claude Code')).toBeInTheDocument()
-
-  await user.click(screen.getByRole('switch'))
-  await screen.findByRole('button', { name: 'Aider' }).catch(() => null)
   expect(location).toContain('status=in_use')
-  expect(location).toContain('archived=1')
 
-  // "Reload" with the same URL: filters come back.
+  await user.click(toggle('已弃用'))
+  expect(card('Aider').className).toContain('opacity-60')
+  expect(location).toContain('status=in_use%2Carchived')
+
+  // Down to archived only; the last one cannot be switched off.
+  await user.click(toggle('使用中'))
+  expect(screen.queryByRole('button', { name: 'Claude Code' })).toBeNull()
+  await user.click(toggle('已弃用'))
+  expect(pressed()).toEqual(['已弃用'])
+  expect(card('Aider')).toBeInTheDocument()
+
+  // "Reload" with the same URL: the selection comes back.
   const saved = location
   unmount()
   renderPage(saved)
+  await screen.findByRole('button', { name: 'Aider' })
+  expect(pressed()).toEqual(['已弃用'])
+  expect(screen.queryByRole('button', { name: 'Claude Code' })).toBeNull()
+
+  // Back to the default: the param leaves the URL.
+  await user.click(toggle('使用中'))
+  await user.click(toggle('关注中'))
+  await user.click(toggle('已弃用'))
+  expect(pressed()).toEqual(['使用中', '关注中'])
+  expect(location).not.toContain('status=')
+  expect(requests.every((r) => !r.path.startsWith('/api/v1/boards/') || r.path.endsWith('includeArchived=true'))).toBe(true)
+})
+
+test('older ?archived=1 links show archived items alongside the default', async () => {
+  renderPage('/boards/ai-stack?archived=1')
+  expect(await screen.findByRole('button', { name: 'Aider' })).toBeInTheDocument()
+  expect(card('Claude Code')).toBeInTheDocument()
+  expect(card('OpenCode')).toBeInTheDocument()
+})
+
+test('hidden archived items never bridge focus links, and cannot be focused', async () => {
+  // OpenCode → Old Model (archived) → Anthropic API.
+  const old = mk({ kind: 'model', name: 'Old Model', status: 'archived', attrs: { vendor: 'X' } })
+  items.push(old)
+  const id = (n: string) => items.find((i) => i.name === n)!.id
+  relations.push(
+    { id: 'r3', type: 'uses', fromId: id('OpenCode'), toId: old.id, attrs: {}, createdAt: '', updatedAt: '' },
+    { id: 'r4', type: 'offered_by', fromId: old.id, toId: id('Anthropic API'), attrs: {}, createdAt: '', updatedAt: '' },
+  )
+  const { unmount } = renderPage(`/boards/ai-stack?focus=${id('OpenCode')}`)
+  expect(await screen.findByRole('status', { name: '聚焦模式' })).toHaveTextContent('OpenCode')
+  expect(within(column('Provider')).getByText('没有与 OpenCode 关联的 Provider')).toBeInTheDocument()
+  unmount()
+
+  // With archived shown, the chain is visible again.
+  const { unmount: unmount2 } = renderPage(`/boards/ai-stack?status=in_use,watching,archived&focus=${id('OpenCode')}`)
+  await screen.findByRole('status', { name: '聚焦模式' })
+  expect(card('Anthropic API').dataset.emphasis).toBe('indirect')
+  unmount2()
+
+  // Focusing a hidden item does nothing.
+  renderPage(`/boards/ai-stack?focus=${old.id}`)
   await screen.findByText('AI 技术栈')
-  expect(screen.queryByRole('button', { name: 'OpenCode' })).toBeNull()
-  expect(screen.getByRole('switch')).toBeChecked()
-  await user.click(screen.getByRole('button', { name: '全部' }))
-  const aider = await screen.findByRole('button', { name: 'Aider' })
-  expect(aider.className).toContain('opacity-60')
-  expect(requests.some((r) => r.path === '/api/v1/boards/ai-stack?includeArchived=true')).toBe(true)
+  expect(screen.queryByRole('status', { name: '聚焦模式' })).toBeNull()
 })
 
 test('add drawer renders the kind-specific fields from definitions', async () => {

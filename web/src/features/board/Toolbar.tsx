@@ -1,27 +1,21 @@
 import { Search } from 'lucide-react'
 import type { Status } from '@/api/types'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { BoardFilter } from '@/lib/filter'
-
-const STATUS_FILTERS: { value: Status | ''; label: string }[] = [
-  { value: '', label: '全部' },
-  { value: 'in_use', label: '使用中' },
-  { value: 'watching', label: '关注中' },
-]
+import { STATUSES, statusDotClass, statusToggleClass } from '@/lib/status'
+import { cn } from '@/lib/utils'
 
 interface Props {
   title: string
   filter: BoardFilter
   onQuery: (q: string) => void
-  onStatus: (s: Status | '') => void
-  onShowArchived: (on: boolean) => void
+  counts: Record<Status, number>
+  onStatuses: (s: Status[]) => void
   extra?: React.ReactNode
 }
 
-export function Toolbar({ title, filter, onQuery, onStatus, onShowArchived, extra }: Props) {
+export function Toolbar({ title, filter, onQuery, counts, onStatuses, extra }: Props) {
   return (
     <header className="flex flex-wrap items-center gap-3 border-b px-4 py-3">
       <h1 className="mr-auto text-lg font-semibold">{title}</h1>
@@ -37,24 +31,23 @@ export function Toolbar({ title, filter, onQuery, onStatus, onShowArchived, extr
         />
       </div>
       <ToggleGroup
+        multiple
         variant="outline"
         aria-label="状态筛选"
-        value={[filter.status]}
+        value={filter.statuses}
         onValueChange={(v) => {
-          // Single choice: clicking the pressed item again keeps it selected.
-          if (v.length) onStatus(v[v.length - 1] as Status | '')
+          // At least one status stays selected, so the board never goes blank.
+          if (v.length) onStatuses(v as Status[])
         }}
       >
-        {STATUS_FILTERS.map((s) => (
-          <ToggleGroupItem key={s.value} value={s.value}>
+        {STATUSES.map((s) => (
+          <ToggleGroupItem key={s.value} value={s.value} className={statusToggleClass[s.value]}>
+            <span aria-hidden className={cn('size-2 rounded-full', statusDotClass[s.value])} />
             {s.label}
+            <span className="tabular-nums opacity-70">{counts[s.value]}</span>
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
-      <div className="flex items-center gap-2">
-        <Switch id="show-archived" checked={filter.showArchived} onCheckedChange={onShowArchived} />
-        <Label htmlFor="show-archived">显示已弃用</Label>
-      </div>
       {extra}
     </header>
   )

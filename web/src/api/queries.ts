@@ -19,7 +19,7 @@ export function useBoard(key: string, includeArchived: boolean) {
   return useQuery({
     queryKey: queryKeys.board(key, includeArchived),
     queryFn: () => api.board(key, includeArchived),
-    // Keep cards on screen while toggling 显示已弃用 refetches.
+    // Keep cards on screen while a different board or archive setting loads.
     placeholderData: keepPreviousData,
   })
 }

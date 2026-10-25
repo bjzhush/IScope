@@ -56,6 +56,12 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - Hover linking and drag sorting are off while focused.
     - Focus mode and relation mode exclude each other.
     - Esc leaves the mode. An open drawer swallows Esc itself, so the first Esc only closes the drawer.
+25. This replaces the design doc's 全部 / 使用中 / 关注中 filter and its 显示已弃用 switch.
+    - The toolbar shows the three statuses as one multi-select toggle group. Each toggle has a status-colored dot and a count of the items that match the current search. A pressed toggle takes its status color.
+    - At least one status stays selected. The default is 使用中 + 关注中.
+    - The URL is `?status=in_use,archived`, omitted for the default. Older `?status=in_use` and `?archived=1` links still parse (`parseStatuses`).
+    - The board page always fetches with `includeArchived=true`, so archived items are filtered on the client. This lets the counts include archived items, and relation-mode toggles keep links to archived items.
+    - Hover and focus linking only go through items whose status is selected. A focus or relation-mode source that is hidden by the status filter counts as inactive.
 
 ## Implementation notes
 

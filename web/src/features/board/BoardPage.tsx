@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CatalogDialog } from '@/features/catalog/CatalogDialog'
 import { ItemSheet } from '@/features/editor/ItemSheet'
-import { matchesFilter } from '@/lib/filter'
+import { DEFAULT_STATUSES, matchesFilter, statusCounts } from '@/lib/filter'
 import { buildAdjacency, focusLayers, otherEnd, relationTypeBetween } from '@/lib/relations'
 import { compareItems } from '@/lib/sort'
 import { useMediaQuery } from '@/lib/useMediaQuery'
@@ -38,7 +38,9 @@ export function BoardPage() {
   const { key = '' } = useParams()
   const f = useBoardFilters()
   const kinds = useKinds()
-  const board = useBoard(key, f.filter.showArchived)
+  // Always fetch archived items too: the toolbar counts them, and relation mode
+  // must see links to them so a toggle never drops those links.
+  const board = useBoard(key, true)
   const quick = useQuickUpdate(key)
   const del = useDeleteItem(key)
   const move = useMoveItem(key)
@@ -50,14 +52,24 @@ export function BoardPage() {
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
 
   const relations = board.data?.relations
-  const adjacency = useMemo(() => buildAdjacency(relations ?? []), [relations])
+  // Items whose status is selected. Hover and focus linking only run through
+  // these, so a hidden archived item never bridges two visible ones.
+  const statuses = f.filter.statuses
+  const visibleIds = useMemo(
+    () => new Set((board.data?.items ?? []).filter((it) => statuses.includes(it.status)).map((it) => it.id)),
+    [board.data, statuses],
+  )
+  const adjacency = useMemo(
+    () => buildAdjacency((relations ?? []).filter((r) => visibleIds.has(r.fromId) && visibleIds.has(r.toId))),
+    [relations, visibleIds],
+  )
   const kindByKey = useMemo(
     () => new Map<string, Kind>((kinds.data?.kinds ?? []).map((k) => [k.key, k])),
     [kinds.data],
   )
 
   // Focus mode (?focus=<id>): null once the item is deleted or hidden.
-  const focusItem = board.data?.items.find((it) => it.id === f.focusId) ?? null
+  const focusItem = board.data?.items.find((it) => it.id === f.focusId && visibleIds.has(it.id)) ?? null
   const layers = useMemo(() => {
     if (!focusItem || !board.data) return null
     const kindOf = new Map(board.data.items.map((it) => [it.id, it.kind]))
@@ -81,8 +93,14 @@ export function BoardPage() {
     })
   }, [board.data, kindByKey, f.filter, focusItem, layers])
 
+  const q = f.filter.q
+  const counts = useMemo(() => {
+    const onBoard = new Set(board.data?.board.columns ?? [])
+    return statusCounts(board.data?.items ?? [], (k) => (onBoard.has(k) ? kindByKey.get(k)?.fields : undefined), q)
+  }, [board.data, kindByKey, q])
+
   // Relation mode: the source item (null once it is deleted or hidden).
-  const linkSource = board.data?.items.find((it) => it.id === linkSourceId) ?? null
+  const linkSource = board.data?.items.find((it) => it.id === linkSourceId && visibleIds.has(it.id)) ?? null
 
   // Esc leaves relation or focus mode. An open drawer or dialog swallows Esc
   // itself, so closing one never ends the mode as well.
@@ -180,7 +198,7 @@ export function BoardPage() {
     return <p className="p-6 text-muted-foreground">加载中…</p>
   }
 
-  const filtered = f.filter.q.trim() !== '' || f.filter.status !== ''
+  const filtered = f.filter.q.trim() !== '' || DEFAULT_STATUSES.some((s) => !statuses.includes(s))
   const hoveredNeighbors = hoverActive && hovered ? (adjacency.get(hovered) ?? null) : null
   const renderColumn = ({ kind, items }: (typeof columns)[number]) => (
     <Column
@@ -207,8 +225,8 @@ export function BoardPage() {
         title={board.data.board.title}
         filter={f.filter}
         onQuery={f.setQuery}
-        onStatus={f.setStatus}
-        onShowArchived={f.setShowArchived}
+        counts={counts}
+        onStatuses={f.setStatuses}
         extra={<DataMenu onCatalog={() => setCatalogOpen(true)} />}
       />
       {linkSource && (

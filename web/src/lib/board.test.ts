@@ -1,5 +1,5 @@
-import type { Field, Item } from '@/api/types'
-import { matchesFilter } from './filter'
+import type { Field, Item, Status } from '@/api/types'
+import { formatStatuses, matchesFilter, parseStatuses, statusCounts } from './filter'
 import { cardDetails, formatFieldValue } from './format'
 import { compareItems } from './sort'
 
@@ -44,7 +44,7 @@ test('formatFieldValue and cardDetails follow field types', () => {
 
 describe('matchesFilter', () => {
   const it = mk({ name: 'Claude Code', summary: '终端 agent', tags: ['CLI'], attrs: { form: 'desktop', compat: ['openai'], vendor: 'Anthropic' } })
-  const f = { q: '', status: '' as const, showArchived: false }
+  const f = { q: '', statuses: ['in_use', 'watching'] as Status[] }
 
   test.each([
     ['claude', true],
@@ -58,11 +58,37 @@ describe('matchesFilter', () => {
     expect(matchesFilter(it, fields, { ...f, q })).toBe(want)
   })
 
-  test('status and archived', () => {
-    expect(matchesFilter(it, fields, { ...f, status: 'in_use' })).toBe(false)
-    expect(matchesFilter(it, fields, { ...f, status: 'watching' })).toBe(true)
+  test('statuses', () => {
+    expect(matchesFilter(it, fields, { ...f, statuses: ['in_use'] })).toBe(false)
+    expect(matchesFilter(it, fields, { ...f, statuses: ['watching'] })).toBe(true)
     const archived = mk({ status: 'archived' })
     expect(matchesFilter(archived, fields, f)).toBe(false)
-    expect(matchesFilter(archived, fields, { ...f, showArchived: true })).toBe(true)
+    expect(matchesFilter(archived, fields, { ...f, statuses: ['in_use', 'archived'] })).toBe(true)
   })
+})
+
+test.each([
+  [null, false, ['in_use', 'watching'], null],
+  ['archived,in_use', false, ['in_use', 'archived'], 'in_use,archived'], // canonical order
+  ['in_use,watching,archived', false, ['in_use', 'watching', 'archived'], 'in_use,watching,archived'],
+  ['in_use', false, ['in_use'], 'in_use'], // older single-status link
+  [null, true, ['in_use', 'watching', 'archived'], 'in_use,watching,archived'], // older ?archived=1
+  ['watching', true, ['watching'], 'watching'], // ?archived=1 only widens the default
+  ['bogus', false, ['in_use', 'watching'], null],
+] as const)('parseStatuses(%s, %s) → %j, written as %s', (param, legacy, want, written) => {
+  const got = parseStatuses(param, legacy)
+  expect(got).toEqual(want)
+  expect(formatStatuses(got)).toBe(written)
+})
+
+test('statusCounts counts search matches per status, only for board kinds', () => {
+  const items = [
+    mk({ id: 'a', status: 'in_use', name: 'Claude' }),
+    mk({ id: 'b', status: 'archived', name: 'Claude Old' }),
+    mk({ id: 'c', status: 'watching', name: 'Other' }),
+    mk({ id: 'd', kind: 'elsewhere', status: 'in_use', name: 'Claude' }),
+  ]
+  const fieldsOf = (k: string) => (k === 'k' ? fields : undefined)
+  expect(statusCounts(items, fieldsOf, '')).toEqual({ in_use: 1, watching: 1, archived: 1 })
+  expect(statusCounts(items, fieldsOf, 'claude')).toEqual({ in_use: 1, watching: 0, archived: 1 })
 })
