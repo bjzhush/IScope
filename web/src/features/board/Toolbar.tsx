@@ -1,4 +1,4 @@
-import { Search } from 'lucide-react'
+import { Check, Search } from 'lucide-react'
 import type { Status } from '@/api/types'
 import { Input } from '@/components/ui/input'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -41,7 +41,12 @@ export function Toolbar({ title, filter, onQuery, counts, onStatuses, extra }: P
         }}
       >
         {STATUSES.map((s) => (
-          <ToggleGroupItem key={s.value} value={s.value} className={statusToggleClass[s.value]}>
+          <ToggleGroupItem key={s.value} value={s.value} className={statusToggleClass}>
+            {/* Hidden rather than removed when off, so toggling never shifts the row. */}
+            <Check
+              aria-hidden
+              className={cn('size-3.5', !filter.statuses.includes(s.value) && 'invisible')}
+            />
             <span aria-hidden className={cn('size-2 rounded-full', statusDotClass[s.value])} />
             {s.label}
             <span className="tabular-nums opacity-70">{counts[s.value]}</span>

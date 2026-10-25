@@ -222,6 +222,11 @@ test('status toggles: multi-select with counts, at least one stays on, URL survi
 
   // Default: in use + watching; counts include the hidden archived item.
   expect(pressed()).toEqual(['使用中', '关注中'])
+  // Pressed toggles show a check; an unpressed one keeps its space with a hidden one.
+  const checked = (l: string) => !toggle(l).querySelector('svg')!.classList.contains('invisible')
+  expect(['使用中', '关注中', '已弃用'].map(checked)).toEqual([true, true, false])
+  // All toggles share one style; only the dot is status-colored.
+  expect(new Set([toggle('使用中'), toggle('已弃用')].map((b) => b.className)).size).toBe(1)
   expect([toggle('使用中'), toggle('关注中'), toggle('已弃用')].map((b) => b.textContent)).toEqual([
     '使用中2', '关注中3', '已弃用1',
   ])

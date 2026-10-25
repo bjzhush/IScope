@@ -14,19 +14,13 @@ export const statusBadgeClass: Record<Status, string> = {
   archived: 'bg-muted text-muted-foreground',
 }
 
-// Toolbar filter: a dot in the status color, and the badge colors when pressed
-// (archived a shade darker than its badge, so pressed reads as pressed).
+// Toolbar filter: every pressed toggle looks the same (dark fill and a check),
+// so pressed vs not reads at a glance. Only the dot carries the status color.
 export const statusDotClass: Record<Status, string> = {
   in_use: 'bg-emerald-500',
   watching: 'bg-sky-500',
   archived: 'bg-zinc-400',
 }
 
-export const statusToggleClass: Record<Status, string> = {
-  in_use:
-    'aria-pressed:border-emerald-300 aria-pressed:bg-emerald-100 aria-pressed:text-emerald-800 aria-pressed:hover:bg-emerald-200 dark:aria-pressed:border-emerald-800 dark:aria-pressed:bg-emerald-950 dark:aria-pressed:text-emerald-300',
-  watching:
-    'aria-pressed:border-sky-300 aria-pressed:bg-sky-100 aria-pressed:text-sky-800 aria-pressed:hover:bg-sky-200 dark:aria-pressed:border-sky-800 dark:aria-pressed:bg-sky-950 dark:aria-pressed:text-sky-300',
-  archived:
-    'aria-pressed:border-zinc-400 aria-pressed:bg-zinc-200 aria-pressed:text-zinc-800 aria-pressed:hover:bg-zinc-300 dark:aria-pressed:border-zinc-600 dark:aria-pressed:bg-zinc-800 dark:aria-pressed:text-zinc-200',
-}
+export const statusToggleClass =
+  'text-muted-foreground aria-pressed:border-primary aria-pressed:bg-primary aria-pressed:text-primary-foreground aria-pressed:hover:bg-primary/85 aria-pressed:hover:text-primary-foreground'
