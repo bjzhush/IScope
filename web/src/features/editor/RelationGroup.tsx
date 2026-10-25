@@ -24,11 +24,14 @@ interface Props {
 export function RelationGroup({ kind, drafts, itemsById, candidates, errors, onAdd, onRemove, onAttrsChange }: Props) {
   return (
     <div className="grid gap-2" role="group" aria-label={`关联的 ${kind.label}`}>
+      {/* The add button sits right after the title, so it never moves as chips wrap. */}
       <div className="flex items-center gap-1.5 text-sm font-medium">
         <KindIcon name={kind.icon} className="size-3.5 text-muted-foreground" />
         {kind.label}
+        <RelationPicker kind={kind} candidates={candidates} onPick={onAdd} />
       </div>
       <div className="flex flex-wrap items-center gap-1.5">
+        {drafts.length === 0 && <span className="text-sm text-muted-foreground">未关联</span>}
         {drafts.map((d) => (
           <RelationChip
             key={d.targetId}
@@ -39,7 +42,6 @@ export function RelationGroup({ kind, drafts, itemsById, candidates, errors, onA
             onAttrsChange={(attrs) => onAttrsChange(d.targetId, attrs)}
           />
         ))}
-        <RelationPicker kind={kind} candidates={candidates} onPick={onAdd} />
       </div>
     </div>
   )

@@ -4,76 +4,7 @@
             "key": "harness",
             "label": "Harness",
             "icon": "terminal",
-            "fields": [
-                {
-                    "key": "form",
-                    "label": "\u5f62\u6001",
-                    "type": "select",
-                    "options": [
-                        {
-                            "value": "cli",
-                            "label": "CLI"
-                        },
-                        {
-                            "value": "ide",
-                            "label": "IDE"
-                        },
-                        {
-                            "value": "desktop",
-                            "label": "\u684c\u9762"
-                        },
-                        {
-                            "value": "web",
-                            "label": "Web"
-                        },
-                        {
-                            "value": "framework",
-                            "label": "\u6846\u67b6"
-                        }
-                    ],
-                    "showOnCard": true
-                },
-                {
-                    "key": "vendor",
-                    "label": "\u51fa\u54c1\u65b9",
-                    "type": "text"
-                },
-                {
-                    "key": "open_source",
-                    "label": "\u5f00\u6e90",
-                    "type": "bool",
-                    "showOnCard": true
-                },
-                {
-                    "key": "pricing",
-                    "label": "\u8ba1\u8d39\u65b9\u5f0f",
-                    "type": "select",
-                    "options": [
-                        {
-                            "value": "free",
-                            "label": "\u514d\u8d39"
-                        },
-                        {
-                            "value": "subscription",
-                            "label": "\u8ba2\u9605"
-                        },
-                        {
-                            "value": "usage",
-                            "label": "\u6309\u91cf"
-                        },
-                        {
-                            "value": "byok",
-                            "label": "\u81ea\u5e26 Key"
-                        }
-                    ]
-                },
-                {
-                    "key": "config_path",
-                    "label": "\u914d\u7f6e\u4f4d\u7f6e",
-                    "type": "text",
-                    "placeholder": "~/.claude/settings.json"
-                }
-            ]
+            "fields": []
         },
         {
             "key": "model",

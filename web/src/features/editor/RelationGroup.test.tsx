@@ -75,3 +75,16 @@ test('chip popover edits relation attrs and shows validation errors', async () =
   expect(pop.queryByText('不能小于 0')).toBeNull()
   expect(latest[0].attrs.input_price).toBe('3')
 })
+
+test('the add button sits in the title row, so chips never push it around', () => {
+  const { rerender } = render(<Harness initial={[]} />)
+  const title = screen.getByText('Provider')
+  const add = screen.getByRole('button', { name: '添加 Provider' })
+  expect(add.parentElement).toBe(title)
+  expect(add).toHaveTextContent(/^添加$/)
+  expect(screen.getByText('未关联')).toBeInTheDocument()
+
+  rerender(<Harness key="linked" initial={[newDraft('p1', offered), newDraft('p2', offered)]} />)
+  expect(screen.getByRole('button', { name: '添加 Provider' }).parentElement).toBe(screen.getByText('Provider'))
+  expect(screen.queryByText('未关联')).toBeNull()
+})

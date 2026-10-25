@@ -24,7 +24,8 @@ func TestKindsEndpoint(t *testing.T) {
 		t.Fatalf("payload: %s", rec.Body)
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`"showOnCard":true`, `"integer":true`, `"fromKind":"model"`, `"min":1`} {
+	// Harness has no fields; the frontend relies on an empty array, not null.
+	for _, want := range []string{`"showOnCard":true`, `"integer":true`, `"fromKind":"model"`, `"min":1`, `"icon":"terminal","fields":[]`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("payload missing %s", want)
 		}

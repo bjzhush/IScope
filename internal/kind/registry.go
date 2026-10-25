@@ -101,6 +101,9 @@ func (r *Registry) RegisterKind(k Kind) {
 	if n > maxShowOnCard {
 		panic(fmt.Sprintf("kind %q: %d showOnCard fields, max %d", k.Key, n, maxShowOnCard))
 	}
+	if k.Fields == nil {
+		k.Fields = []Field{} // a kind without fields still sends "fields": []
+	}
 	r.kinds = append(r.kinds, k)
 }
 
@@ -126,6 +129,9 @@ func (r *Registry) RegisterRelation(rt RelationType) {
 		panic(fmt.Sprintf("%s: kinds %s and %s already related by %q", name, rt.FromKind, rt.ToKind, x.Key))
 	}
 	checkFields(name, rt.Fields)
+	if rt.Fields == nil {
+		rt.Fields = []Field{}
+	}
 	r.relations = append(r.relations, rt)
 }
 

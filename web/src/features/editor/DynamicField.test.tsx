@@ -4,6 +4,7 @@ import { FormProvider, useForm } from 'react-hook-form'
 import type { Field } from '@/api/types'
 import { attrsToForm, itemToForm, type ItemFormValues } from '@/lib/schema'
 import { DynamicField } from './DynamicField'
+import { fieldSpan } from './layout'
 
 let latest: ItemFormValues | undefined
 
@@ -86,4 +87,10 @@ describe('DynamicField', () => {
     render(<Harness field={{ key: 'u', label: 'Base URL', type: 'url' }} />)
     expect(screen.getByLabelText('Base URL')).toHaveAttribute('type', 'url')
   })
+})
+
+test('only multi-line text spans both grid columns', () => {
+  const types = ['text', 'textarea', 'number', 'bool', 'select', 'multiselect', 'date', 'url'] as const
+  const wide = types.filter((type) => fieldSpan({ key: 'k', label: 'l', type }))
+  expect(wide).toEqual(['textarea'])
 })

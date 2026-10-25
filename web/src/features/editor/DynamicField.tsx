@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type { FormAttrValue, ItemFormValues } from '@/lib/schema'
 import { FormRow } from './FormRow'
+import { fieldSpan } from './layout'
 
 // Options below this count render as a toggle group, otherwise a searchable popover.
 const TOGGLE_MAX_OPTIONS = 6
@@ -31,7 +32,7 @@ export function DynamicField({ field }: { field: Field }) {
   const id = `field-${name}`
 
   return (
-    <FormRow id={id} label={field.label} required={field.required} error={fieldState.error?.message}>
+    <FormRow id={id} label={field.label} required={field.required} error={fieldState.error?.message} className={fieldSpan(field)}>
       <FieldControl
         field={field}
         id={id}

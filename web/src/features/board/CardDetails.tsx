@@ -1,19 +1,21 @@
-import { Info } from 'lucide-react'
+import { ExternalLink, Info } from 'lucide-react'
 import type { Field, Item } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { cardDetails } from '@/lib/format'
+import { isHttpUrl } from '@/lib/schema'
 import { tagClass } from './TagStrip'
 
 // Popups are portalled, but React events still bubble to the card through the
 // component tree, so stop them here or a click would open the drawer.
 const stop = (e: React.SyntheticEvent) => e.stopPropagation()
 
-// Info button that shows the summary, card fields and all tags. It opens on hover over the
+// Info button that shows the summary, card fields, all tags and the links. It opens on hover over the
 // button itself, and a click pins it open (the only way on touch screens).
 export function CardDetails({ item, fields }: { item: Item; fields: Field[] }) {
   const details = cardDetails(fields, item)
-  if (!item.summary && details.length === 0 && item.tags.length === 0) return null
+  const links = item.links.filter((l) => isHttpUrl(l.url))
+  if (!item.summary && details.length === 0 && item.tags.length === 0 && links.length === 0) return null
 
   return (
     <Popover>
@@ -46,6 +48,24 @@ export function CardDetails({ item, fields }: { item: Item; fields: Field[] }) {
               </Badge>
             ))}
           </div>
+        )}
+        {links.length > 0 && (
+          <ul className="grid gap-1 text-xs">
+            {links.map((l, i) => (
+              <li key={i}>
+                <a
+                  href={l.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={l.url}
+                  className="inline-flex max-w-full items-center gap-1 text-primary underline-offset-2 hover:underline"
+                >
+                  <ExternalLink className="size-3 shrink-0" />
+                  <span className="truncate">{l.label.trim() || l.url}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
         )}
       </PopoverContent>
     </Popover>

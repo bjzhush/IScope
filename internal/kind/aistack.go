@@ -5,18 +5,9 @@ func ptr(f float64) *float64 { return &f }
 // RegisterAIStack registers the AI 技术栈 page: harness / model / provider.
 func RegisterAIStack(r *Registry) {
 	r.RegisterKind(Kind{
+		// No kind-specific fields: a harness is described by its summary, tags
+		// and links (e.g. one to the vendor), and by what it uses and connects to.
 		Key: "harness", Label: "Harness", Icon: "terminal",
-		Fields: []Field{
-			{Key: "form", Label: "形态", Type: FieldSelect, ShowOnCard: true, Options: []Option{
-				{"cli", "CLI"}, {"ide", "IDE"}, {"desktop", "桌面"}, {"web", "Web"}, {"framework", "框架"},
-			}},
-			{Key: "vendor", Label: "出品方", Type: FieldText},
-			{Key: "open_source", Label: "开源", Type: FieldBool, ShowOnCard: true},
-			{Key: "pricing", Label: "计费方式", Type: FieldSelect, Options: []Option{
-				{"free", "免费"}, {"subscription", "订阅"}, {"usage", "按量"}, {"byok", "自带 Key"},
-			}},
-			{Key: "config_path", Label: "配置位置", Type: FieldText, Placeholder: "~/.claude/settings.json"},
-		},
 	})
 
 	r.RegisterKind(Kind{

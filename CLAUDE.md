@@ -49,7 +49,7 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 
 ## Later changes
 
-22. A card is a single row. Tags are right-aligned in that row (`TagStrip.tsx`) and take at most 30% of its width. Tags that don't fit collapse into `+N`. An invisible copy of the tags is measured, `lib/fitTags.ts` computes how many fit, and the count is recomputed when the row resizes. The summary, the `ShowOnCard` fields (each with its label) and all tags are in a details popover (`CardDetails.tsx`). It opens when you hover its info button, not the card, and clicking the button pins it open. The button is hidden when there is nothing to show. Clicks on the button or inside the popup are stopped, because React bubbles them through the portal to the card.
+22. A card is a single row. Tags are right-aligned in that row (`TagStrip.tsx`) and take at most 30% of its width. Tags that don't fit collapse into `+N`. An invisible copy of the tags is measured, `lib/fitTags.ts` computes how many fit, and the count is recomputed when the row resizes. The summary, the `ShowOnCard` fields (each with its label), all tags and the http(s) links (label, or the URL when there is none; they open in a new tab) are in a details popover (`CardDetails.tsx`). It opens when you hover its info button, not the card, and clicking the button pins it open. The button is hidden when there is nothing to show. Clicks on the button or inside the popup are stopped, because React bubbles them through the portal to the card.
 23. Hover linking waits until the pointer has rested on a card for 150ms (`useSettledHover`), and leaving a card waits just as long. Sweeping across cards therefore doesn't flash, and moving from one card to the next switches highlights directly. While you hover a card, any of its neighbours that are scrolled out of view in another column are counted at that column's top and bottom edges ("上方/下方还有 N 个关联"; `lib/offscreen.ts`). The hints ignore the pointer, because reaching for one would end the hover.
 24. Focus mode (`?focus=<id>`) starts from a card's 聚焦关联 menu item.
     - The focused card's own column stays complete. Every other column shows only layer 1 (direct neighbours, solid ring) and then layer 2 (their neighbours, dashed border; `focusLayers`). Layer 2 never includes the focused item's own kind.
@@ -62,6 +62,16 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - The URL is `?status=in_use,archived`, omitted for the default. Older `?status=in_use` and `?archived=1` links still parse (`parseStatuses`).
     - The board page always fetches with `includeArchived=true`, so archived items are filtered on the client. This lets the counts include archived items, and relation-mode toggles keep links to archived items.
     - Hover and focus linking only go through items whose status is selected. A focus or relation-mode source that is hidden by the status filter counts as inactive.
+26. Harness has no kind fields. Migration `0002_drop_harness_fields.sql` removed `open_source`, `pricing` and `config_path`, and `0003_drop_harness_form_vendor.sql` removed `form` and `vendor`. Both clear the values from stored attrs and bump `updated_at` on the items they change.
+    - Without the migrations, saving those items would fail: attrs validation rejects undefined keys, and updates validate the merged attrs. An old export that still has these keys fails to import for the same reason.
+    - A vendor is now recorded as a link.
+    - The registry sends a kind without fields as `"fields": []`, never `null`.
+27. The drawer is up to 880px wide. Each section (基本信息 / {kind} 字段 / 关联 / 链接与笔记) is a two-column grid.
+    - Basic fields: 名称 | 状态, then 一句话描述 across both columns, then 标签 | 评分.
+    - Kind fields: one cell each, in registry order. Only `textarea` spans both columns (`editor/layout.ts`).
+    - Relation groups pair up two per row, e.g. Model | Provider in a harness drawer. Each group's "+ 添加" button sits right after its title (aria-label `添加 {kind}`), so it stays put however the chips wrap. An empty group shows 未关联.
+    - Links and notes sit side by side at the bottom. Each link row has an open button that opens the URL typed so far in a new tab, even before saving. It is disabled until that URL is valid http(s).
+    - A kind without fields has no {kind} 字段 section.
 
 ## Implementation notes
 

@@ -1,4 +1,5 @@
 import { Label } from '@/components/ui/label'
+import { cn } from '@/lib/utils'
 
 interface Props {
   id: string
@@ -6,11 +7,12 @@ interface Props {
   required?: boolean
   error?: string
   children: React.ReactNode
+  className?: string
 }
 
-export function FormRow({ id, label, required, error, children }: Props) {
+export function FormRow({ id, label, required, error, children, className }: Props) {
   return (
-    <div className="grid gap-1.5">
+    <div className={cn('grid content-start gap-1.5', className)}>
       <Label htmlFor={id}>
         {label}
         {required && <span className="text-destructive">*</span>}

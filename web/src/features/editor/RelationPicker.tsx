@@ -18,13 +18,15 @@ interface Props {
   onPick: (id: string) => void
 }
 
-// "+ 添加 {kind}": a searchable list of items that can still be linked.
+// "+ 添加" next to a relation group's title: a searchable list of items that
+// can still be linked. The group title names the kind, so the button does not.
+
 export function RelationPicker({ kind, candidates, onPick }: Props) {
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger render={<Button type="button" variant="outline" size="xs" />}>
-        <Plus /> 添加 {kind.label}
+      <PopoverTrigger render={<Button type="button" variant="outline" size="xs" aria-label={`添加 ${kind.label}`} />}>
+        <Plus /> 添加
       </PopoverTrigger>
       <PopoverContent className="w-64 p-0" align="start">
         <Command>

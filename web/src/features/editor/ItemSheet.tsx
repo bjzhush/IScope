@@ -20,10 +20,13 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { relationTypeBetween } from '@/lib/relations'
 import { buildItemSchema, diffPatch, itemToForm, toCreateInput, type ItemFormValues } from '@/lib/schema'
-import { BasicFields } from './BasicFields'
+import { CoreFields, LinksAndNotes } from './BasicFields'
 import { DynamicField } from './DynamicField'
 import { draftErrors, draftsFromRelations, newDraft, relationsPayload } from './relationDrafts'
 import { RelationGroup } from './RelationGroup'
+
+const heading = 'mb-3 text-sm font-semibold text-muted-foreground'
+const grid = 'grid gap-x-4 gap-y-3 sm:grid-cols-2'
 
 interface Props {
   boardKey: string
@@ -82,7 +85,7 @@ export function ItemSheet({ boardKey, kinds, columns, relationTypes, editingId, 
   return (
     <>
       <Sheet open={open} onOpenChange={(o) => !o && requestClose()}>
-        <SheetContent className="w-full gap-0 p-0 data-[side=right]:sm:max-w-[480px]">{body}</SheetContent>
+        <SheetContent className="w-full gap-0 p-0 data-[side=right]:sm:max-w-[880px]">{body}</SheetContent>
       </Sheet>
       <AlertDialog open={confirmDiscard} onOpenChange={setConfirmDiscard}>
         <AlertDialogContent>
@@ -232,19 +235,22 @@ function ItemForm(props: FormProps) {
   return (
     <FormProvider {...form}>
       <form className="flex h-full min-h-0 flex-col" onSubmit={(e) => save()(e)} noValidate>
-        <SheetHeader className="border-b">
+        <SheetHeader className="border-b px-6">
           <SheetTitle>{item ? `编辑 ${item.name}` : `新增 ${kind.label}`}</SheetTitle>
           <SheetDescription>{kind.label}</SheetDescription>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          <h3 className="mb-3 text-sm font-semibold text-muted-foreground">基本信息</h3>
-          <BasicFields />
+        {/* Sections stack top to bottom; inside each, short fields pair up two per row. */}
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          <h3 className={heading}>基本信息</h3>
+          <div className={grid}>
+            <CoreFields />
+          </div>
           {kind.fields.length > 0 && (
             <>
-              <Separator className="my-5" />
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">{kind.label} 字段</h3>
-              <div className="grid gap-4">
+              <Separator className="my-4" />
+              <h3 className={heading}>{kind.label} 字段</h3>
+              <div className={grid}>
                 {kind.fields.map((f) => (
                   <DynamicField key={f.key} field={f} />
                 ))}
@@ -253,9 +259,9 @@ function ItemForm(props: FormProps) {
           )}
           {groups.length > 0 && (
             <>
-              <Separator className="my-5" />
-              <h3 className="mb-3 text-sm font-semibold text-muted-foreground">关联</h3>
-              <div className="grid gap-4">
+              <Separator className="my-4" />
+              <h3 className={heading}>关联</h3>
+              <div className={grid}>
                 {groups.map(({ kind: other, type }) => {
                   const mine = drafts.filter((d) => itemsById.get(d.targetId)?.kind === other.key)
                   const linked = new Set(drafts.map((d) => d.targetId))
@@ -280,9 +286,14 @@ function ItemForm(props: FormProps) {
               </div>
             </>
           )}
+          <Separator className="my-4" />
+          <h3 className={heading}>链接与笔记</h3>
+          <div className={grid}>
+            <LinksAndNotes />
+          </div>
         </div>
 
-        <footer className="grid gap-2 border-t px-4 py-3">
+        <footer className="grid gap-2 border-t px-6 py-3">
           {formError && (
             <p role="alert" className="text-sm text-destructive">
               {formError}

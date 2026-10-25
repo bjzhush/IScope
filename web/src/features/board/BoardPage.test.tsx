@@ -168,13 +168,15 @@ beforeEach(() => {
   requests = []
   items = [
     mk({ kind: 'harness', name: 'Claude Code', status: 'in_use', pinned: true, summary: '终端 agent',
-      tags: ['agent', 'coding', 'cli', 'daily'], attrs: { form: 'cli', open_source: false } }),
-    mk({ kind: 'harness', name: 'OpenCode', attrs: { form: 'cli', open_source: true } }),
+      tags: ['agent', 'coding', 'cli', 'daily'] }),
+    mk({ kind: 'harness', name: 'OpenCode' }),
     mk({ kind: 'harness', name: 'Aider', status: 'archived' }),
     mk({ kind: 'model', name: 'Claude Sonnet 5.5', status: 'in_use',
       attrs: { vendor: 'Anthropic', context_window: 1000000 } }),
     mk({ kind: 'provider', name: 'OpenRouter', attrs: { provider_type: 'aggregator', api_compat: ['openai', 'anthropic'] } }),
-    mk({ kind: 'provider', name: 'Anthropic API', attrs: { provider_type: 'official' } }),
+    // Only links, so the details button exists because of them.
+    mk({ kind: 'provider', name: 'Anthropic API',
+      links: [{ label: '控制台', url: 'https://console.anthropic.com' }, { label: '', url: 'https://docs.anthropic.com' }] }),
   ]
   const id = (name: string) => items.find((i) => i.name === name)!.id
   relations = [
@@ -309,16 +311,26 @@ test('add drawer renders the kind-specific fields from definitions', async () =>
   await user.click(screen.getByRole('button', { name: '新增 Harness' }))
   expect(location).toContain('new=harness')
   expect(within(sheet()).getByText('新增 Harness')).toBeInTheDocument()
-  expect(within(sheet()).getByLabelText('形态')).toBeInTheDocument()
-  expect(within(sheet()).getByLabelText('配置位置')).toBeInTheDocument()
+  // Harness has no kind fields: the section is hidden and dropped fields are gone.
+  expect(within(sheet()).queryByText('Harness 字段')).toBeNull()
+  for (const gone of ['形态', '出品方', '开源', '计费方式', '配置位置']) expect(within(sheet()).queryByText(gone)).toBeNull()
   expect(within(sheet()).queryByLabelText(/上下文窗口/)).toBeNull()
+  // Two-column layout: short fields take one cell, the summary spans both, and
+  // the two relation groups sit side by side.
+  const cell = (label: string | RegExp) => within(sheet()).getByLabelText(label).closest('div.grid')!
+  expect(cell('一句话描述').className).toContain('sm:col-span-2')
+  expect(cell(/^名称/).className).not.toContain('col-span')
+  const groups = ['关联的 Model', '关联的 Provider'].map((name) => within(sheet()).getByRole('group', { name }))
+  expect(groups[0].parentElement).toBe(groups[1].parentElement)
+  expect(groups[0].parentElement!.className).toContain('sm:grid-cols-2')
   await user.click(within(sheet()).getByRole('button', { name: '取消' }))
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
 
   await user.click(screen.getByRole('button', { name: '新增 Provider' }))
   expect(within(sheet()).getByLabelText('Base URL')).toHaveAttribute('type', 'url')
   expect(within(sheet()).getByRole('group', { name: '兼容协议' })).toBeInTheDocument()
-  expect(within(sheet()).queryByLabelText('形态')).toBeNull()
+  expect(within(sheet()).getByText('Provider 字段')).toBeInTheDocument()
+  for (const half of ['Base URL', '区域']) expect(cell(half).className).not.toContain('col-span')
 })
 
 test('create model: local validation, server field errors, 409, then success', async () => {
@@ -420,7 +432,7 @@ test('card menu: archive, restore, pin and delete with confirmation', async () =
   ])
 })
 
-test('details popover opens on hovering its button and shows summary and labelled fields', async () => {
+test('details popover opens on hovering its button and shows summary and tags', async () => {
   // While hover-open, Base UI sets pointer-events: none on the body and auto on
   // the popup; jsdom does not inherit computed styles, so skip user-event's check.
   const user = userEvent.setup({ pointerEventsCheck: 0 })
@@ -435,9 +447,6 @@ test('details popover opens on hovering its button and shows summary and labelle
   await user.hover(screen.getByRole('button', { name: 'Claude Code 详情' }))
   const popup = await screen.findByRole('dialog')
   expect(within(popup).getByText('终端 agent')).toBeInTheDocument()
-  expect(within(popup).getByText('形态')).toBeInTheDocument()
-  expect(within(popup).getByText('CLI')).toBeInTheDocument()
-  expect(within(popup).queryByText('开源')).toBeNull() // open_source=false hidden
   expect(within(popup).getByText('coding')).toBeInTheDocument() // all tags
 
   await user.unhover(screen.getByRole('button', { name: 'Claude Code 详情' }))
@@ -468,9 +477,28 @@ test('details popover formats each field type', async () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     return text
   }
-  expect(await open('OpenCode')).toBe('形态CLI开源是')
+  // Nothing to show: no summary, tags or card fields.
+  expect(screen.queryByRole('button', { name: 'OpenCode 详情' })).toBeNull()
   expect(await open('Claude Sonnet 5.5')).toBe('出品方Anthropic上下文窗口1,000,000 tokens')
   expect(await open('OpenRouter')).toBe('类型聚合兼容协议openai / anthropic')
+})
+
+test('details popover lists links that open in a new tab', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  await user.click(screen.getByRole('button', { name: 'Anthropic API 详情' }))
+  const popup = await screen.findByRole('dialog')
+  const console_ = within(popup).getByRole('link', { name: '控制台' })
+  expect(console_).toHaveAttribute('href', 'https://console.anthropic.com')
+  expect(console_).toHaveAttribute('target', '_blank')
+  // A link without a label shows its URL.
+  expect(within(popup).getByRole('link', { name: 'https://docs.anthropic.com' })).toBeInTheDocument()
+  // Following a link never opens the drawer.
+  console_.addEventListener('click', (e) => e.preventDefault())
+  await user.click(console_)
+  await new Promise((r) => setTimeout(r, 100))
+  expect(screen.queryByText('编辑 Anthropic API')).toBeNull()
 })
 
 test('hovering a card highlights direct neighbours and dims the rest', async () => {

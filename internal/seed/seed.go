@@ -19,18 +19,13 @@ var samples = []item.CreateInput{
 	// Harness
 	{Kind: "harness", Name: "Claude Code", Status: s(item.StatusInUse), Pinned: true, Rating: n(5),
 		Summary: "终端里的主力 coding agent", Tags: []string{"agent", "coding", "cli"},
-		Links: []item.Link{{Label: "文档", URL: "https://docs.claude.com/claude-code"}},
-		Attrs: map[string]any{"form": "cli", "vendor": "Anthropic", "open_source": false,
-			"pricing": "subscription", "config_path": "~/.claude/settings.json"}},
+		Links: []item.Link{{Label: "文档", URL: "https://docs.claude.com/claude-code"}}},
 	{Kind: "harness", Name: "Cursor", Status: s(item.StatusWatching),
-		Summary: "AI 原生 IDE", Tags: []string{"ide", "coding"},
-		Attrs: map[string]any{"form": "ide", "vendor": "Anysphere", "open_source": false, "pricing": "subscription"}},
+		Summary: "AI 原生 IDE", Tags: []string{"ide", "coding"}},
 	{Kind: "harness", Name: "OpenCode", Status: s(item.StatusWatching),
-		Summary: "开源终端 agent，可接多家渠道", Tags: []string{"agent", "cli", "oss"},
-		Attrs: map[string]any{"form": "cli", "open_source": true, "pricing": "byok"}},
+		Summary: "开源终端 agent，可接多家渠道", Tags: []string{"agent", "cli", "oss"}},
 	{Kind: "harness", Name: "Aider", Status: s(item.StatusArchived),
-		Summary: "早期用过的结对编程工具", Tags: []string{"cli"},
-		Attrs: map[string]any{"form": "cli", "open_source": true, "pricing": "byok"}},
+		Summary: "早期用过的结对编程工具", Tags: []string{"cli"}},
 
 	// Model
 	{Kind: "model", Name: "Claude Opus 5.5", Status: s(item.StatusInUse), Rating: n(5),
