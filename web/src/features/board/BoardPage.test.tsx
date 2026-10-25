@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
+import { toast } from 'sonner'
 import type { Item, Relation } from '@/api/types'
 import kinds from '@/test/kinds.json'
 import { media } from '@/test/setup'
@@ -748,6 +749,34 @@ test('models.dev import: search, pick, price goes to the matching provider, draw
   })
 })
 
+test('a drop onto another group snaps back and explains the rule', async () => {
+  items.push(mk({ kind: 'harness', name: 'Cursor', sortOrder: 50 }))
+  const rect = vi.spyOn(Element.prototype, 'getBoundingClientRect').mockImplementation(function (this: Element) {
+    const cards = Array.from(document.querySelectorAll('article'))
+    const i = cards.indexOf(this.closest('article') as HTMLElement)
+    const top = Math.max(i, 0) * 100
+    return { x: 0, y: top, top, left: 0, width: 300, height: 80, right: 300, bottom: top + 80, toJSON() {} } as DOMRect
+  })
+  const info = vi.spyOn(toast, 'info')
+  const user = userEvent.setup()
+  renderPage()
+  const handle = await screen.findByRole('button', { name: '拖动 Cursor' })
+
+  // Cursor → past OpenCode → onto the pinned Claude Code, another group.
+  handle.focus()
+  await user.keyboard('[Space]')
+  await user.keyboard('[ArrowUp]')
+  await user.keyboard('[ArrowUp]')
+  await user.keyboard('[Space]')
+
+  await waitFor(() => expect(info).toHaveBeenCalledWith('无法移到这里', { description: '只能在置顶状态和状态都相同的卡片之间拖动排序' }))
+  expect(requests.some((r) => r.path.endsWith('/move'))).toBe(false)
+  // Lone cards take drops but still cannot be dragged.
+  expect(screen.queryByRole('button', { name: '拖动 Claude Code' })).toBeNull()
+  rect.mockRestore()
+  info.mockRestore()
+})
+
 test('keyboard drag reorders within a group and saves the new neighbours', async () => {
   items.push(mk({ kind: 'harness', name: 'Cursor', sortOrder: 50 }))
   // jsdom has no layout: stack cards vertically by document order.
@@ -764,9 +793,13 @@ test('keyboard drag reorders within a group and saves the new neighbours', async
   // its space so names line up with draggable cards.
   expect(screen.queryByRole('button', { name: '拖动 Claude Code' })).toBeNull()
   const lead = (name: string) => card(name).firstElementChild!.firstElementChild!
-  expect(lead('Claude Code').getAttribute('data-slot')).toBe('handle-space')
+  expect(lead('Claude Code').getAttribute('data-handle')).toBe('blocked')
   expect(lead('Cursor')).toBe(handle)
   expect(lead('Claude Code').className.match(/-ml-\S+/)?.[0]).toBe(handle.className.match(/-ml-\S+/)?.[0])
+  // Its greyed-out handle explains why.
+  await user.hover(lead('Claude Code'))
+  expect(await screen.findByText(/只能在置顶状态和状态都相同的卡片之间拖动排序，这一组只有这一张卡片/)).toBeInTheDocument()
+  await user.unhover(lead('Claude Code'))
 
   handle.focus()
   await user.keyboard('[Space]')

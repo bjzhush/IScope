@@ -2,6 +2,7 @@ import { GripVertical, Pin } from 'lucide-react'
 import type { Field, Item } from '@/api/types'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { statusBadgeClass, statusLabel } from '@/lib/status'
 import type { ItemActions } from './actions'
@@ -34,10 +35,12 @@ export interface ItemCardProps {
   style?: React.CSSProperties
   dragging?: boolean
   dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
+  // Why the card has no handle although sorting is on (alone in its group).
+  dragHint?: string
 }
 
 export function ItemCard(props: ItemCardProps) {
-  const { item, fields, actions, emphasis, onHover, select, linking, ref, style, dragging, dragHandleProps } = props
+  const { item, fields, actions, emphasis, onHover, select, linking, ref, style, dragging, dragHandleProps, dragHint } = props
   const activate = () => {
     if (select) select.onToggle()
     else if (!linking) actions.edit(item)
@@ -86,9 +89,20 @@ export function ItemCard(props: ItemCardProps) {
           >
             <GripVertical className="size-3.5" />
           </button>
+        ) : dragHint ? (
+          // A greyed-out handle that explains why this card cannot be dragged.
+          <Tooltip>
+            <TooltipTrigger
+              render={<span data-handle="blocked" aria-label={dragHint} onClick={(e) => e.stopPropagation()} />}
+              className="-ml-1.5 shrink-0 cursor-not-allowed rounded p-0.5 text-muted-foreground/40 opacity-0 group-hover:opacity-100"
+            >
+              <GripVertical className="size-3.5" />
+            </TooltipTrigger>
+            <TooltipContent>{dragHint}</TooltipContent>
+          </Tooltip>
         ) : (
           // Same footprint as the handle, so names line up whether or not a card can be dragged.
-          <span aria-hidden data-slot="handle-space" className="-ml-1.5 size-4.5 shrink-0" />
+          <span aria-hidden data-handle="space" className="-ml-1.5 size-4.5 shrink-0" />
         )}
         <h3 className="min-w-0 flex-1 truncate font-medium">{item.name}</h3>
         <TagStrip tags={item.tags} />

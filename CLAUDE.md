@@ -37,7 +37,7 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
 
 ## Phase 3 decisions
 
-16. Drag sorting only works inside a group of cards that share both pin state and status (`lib/reorder.ts`); a card dropped anywhere else snaps back. Each group gets its own `SortableContext`, and dragging starts from a grip handle.
+16. Drag sorting only works inside a group of cards that share both pin state and status (`lib/reorder.ts`); a card dropped anywhere else snaps back. Each group gets its own `SortableContext`, and dragging starts from a grip handle. A card alone in its group shows a greyed-out handle whose tooltip explains the rule. It can't be dragged, but it still accepts drops, so a drop onto another group (`crossesGroups`) snaps back with a toast instead of failing silently.
 17. `POST /items/{id}/move` puts the item at the midpoint of its neighbours. If the gaps that would create are smaller than 1e-6, it renumbers the whole kind 1..n instead.
 18. Export and import (`internal/transfer`) run in a single transaction and match items by kind + slug. An item that already exists and differs from the file is overwritten and its `updated_at` becomes the import time. A new item keeps the timestamps from the file, so exporting, importing into an empty database and exporting again gives an identical file. Data missing from the file is left alone. Any validation error rolls back the whole import.
 19. The models.dev import (`internal/catalog`) is configured with `-catalog-url` / `AI_OVERVIEW_CATALOG_URL` and caches the catalog for one hour.

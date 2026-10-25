@@ -16,11 +16,12 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { Item, Kind } from '@/api/types'
 import { KindIcon } from '@/components/KindIcon'
 import { Button } from '@/components/ui/button'
 import { offscreen } from '@/lib/offscreen'
-import { groupKey, type MovePlan, planMove } from '@/lib/reorder'
+import { crossesGroups, DRAG_RULE, groupKey, type MovePlan, planMove } from '@/lib/reorder'
 import type { ItemActions } from './actions'
 import { type Emphasis, ItemCard, type ItemCardProps, type Selectable } from './ItemCard'
 
@@ -65,6 +66,10 @@ export function Column(props: Props) {
   )
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     if (!over) return
+    if (crossesGroups(items, String(active.id), String(over.id))) {
+      toast.info('无法移到这里', { description: DRAG_RULE })
+      return
+    }
     const plan = planMove(items, String(active.id), String(over.id))
     if (plan) onMove(String(active.id), plan)
   }
@@ -110,7 +115,11 @@ export function Column(props: Props) {
                     onHover={onHover}
                     linking={!!linking}
                     select={linking?.(it)}
-                    disabled={!sortable || group.length < 2}
+                    // A card alone in its group cannot be dragged, but still
+                    // takes drops, so a drop onto it can explain the rule.
+                    draggable={sortable && group.length > 1}
+                    droppable={sortable}
+                  dragHint={sortable && group.length < 2 ? `${DRAG_RULE}，这一组只有这一张卡片` : undefined}
                   />
                 ))}
               </SortableContext>
@@ -159,10 +168,10 @@ function EdgeHint({ className, children }: { className: string; children: React.
   )
 }
 
-function SortableCard({ disabled, ...props }: ItemCardProps & { disabled: boolean }) {
+function SortableCard({ draggable, droppable, ...props }: ItemCardProps & { draggable: boolean; droppable: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: props.item.id,
-    disabled,
+    disabled: { draggable: !draggable, droppable: !droppable },
   })
   return (
     <ItemCard
@@ -170,7 +179,7 @@ function SortableCard({ disabled, ...props }: ItemCardProps & { disabled: boolea
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
       dragging={isDragging}
-      dragHandleProps={disabled ? undefined : { ...attributes, ...listeners }}
+      dragHandleProps={draggable ? { ...attributes, ...listeners } : undefined}
     />
   )
 }

@@ -4,6 +4,16 @@ import type { Item, MoveInput } from '@/api/types'
 // because the column always sorts by pinned → status → sortOrder.
 export const groupKey = (it: Item) => `${it.pinned ? 1 : 0}|${it.status}`
 
+// Shown on a card that is alone in its group, and when a drop crosses groups.
+export const DRAG_RULE = '只能在置顶状态和状态都相同的卡片之间拖动排序'
+
+// True when a drop lands on a card of another group (and so snaps back).
+export function crossesGroups(column: Item[], activeId: string, overId: string): boolean {
+  const active = column.find((it) => it.id === activeId)
+  const over = column.find((it) => it.id === overId)
+  return !!active && !!over && groupKey(active) !== groupKey(over)
+}
+
 export interface MovePlan {
   input: MoveInput
   sortOrder: number // the backend's result, applied optimistically
