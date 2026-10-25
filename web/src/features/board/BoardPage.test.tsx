@@ -760,8 +760,13 @@ test('keyboard drag reorders within a group and saves the new neighbours', async
   const user = userEvent.setup()
   renderPage()
   const handle = await screen.findByRole('button', { name: '拖动 Cursor' })
-  // A card alone in its group (pinned Claude Code) has no handle.
+  // A card alone in its group (pinned Claude Code) has no handle, but keeps
+  // its space so names line up with draggable cards.
   expect(screen.queryByRole('button', { name: '拖动 Claude Code' })).toBeNull()
+  const lead = (name: string) => card(name).firstElementChild!.firstElementChild!
+  expect(lead('Claude Code').getAttribute('data-slot')).toBe('handle-space')
+  expect(lead('Cursor')).toBe(handle)
+  expect(lead('Claude Code').className.match(/-ml-\S+/)?.[0]).toBe(handle.className.match(/-ml-\S+/)?.[0])
 
   handle.focus()
   await user.keyboard('[Space]')

@@ -74,17 +74,21 @@ export function ItemCard(props: ItemCardProps) {
       )}
     >
       <div className="flex items-center gap-2">
-        {select && <Checkbox checked={select.checked} tabIndex={-1} aria-hidden className="pointer-events-none" />}
-        {dragHandleProps && !linking && (
+        {select ? (
+          <Checkbox checked={select.checked} tabIndex={-1} aria-hidden className="pointer-events-none" />
+        ) : dragHandleProps && !linking ? (
           <button
             type="button"
             aria-label={`拖动 ${item.name}`}
-            className="-ml-1.5 cursor-grab touch-none rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
+            className="-ml-1.5 shrink-0 cursor-grab touch-none rounded p-0.5 text-muted-foreground opacity-0 group-hover:opacity-100 focus-visible:opacity-100 active:cursor-grabbing"
             {...dragHandleProps}
             onClick={(e) => e.stopPropagation()}
           >
             <GripVertical className="size-3.5" />
           </button>
+        ) : (
+          // Same footprint as the handle, so names line up whether or not a card can be dragged.
+          <span aria-hidden data-slot="handle-space" className="-ml-1.5 size-4.5 shrink-0" />
         )}
         <h3 className="min-w-0 flex-1 truncate font-medium">{item.name}</h3>
         <TagStrip tags={item.tags} />
