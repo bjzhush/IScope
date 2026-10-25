@@ -72,6 +72,7 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - Relation groups pair up two per row, e.g. Model | Provider in a harness drawer. Each group's "+ 添加" button sits right after its title (aria-label `添加 {kind}`), so it stays put however the chips wrap. An empty group shows 未关联.
     - Links and notes sit side by side at the bottom. Each link row has an open button that opens the URL typed so far in a new tab, even before saving. It is disabled until that URL is valid http(s).
     - A kind without fields has no {kind} 字段 section.
+28. The card menu (`ItemMenu.tsx`) is grouped with separators. For an active item the groups are: 置顶 / 取消置顶 | the two other statuses (设为使用中 / 设为关注中 / 设为弃用) | 编辑 | 编辑关联… and 聚焦关联. An archived item has no pin, edit or relation entries, only 设为使用中 / 设为关注中 | 删除. This replaces the menu's old 恢复 entry, so an archived item can now go straight back to 使用中; the drawer's 恢复 button still sets 关注中 (decision 3).
 
 ## Implementation notes
 

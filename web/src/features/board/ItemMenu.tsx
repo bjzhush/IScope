@@ -1,6 +1,6 @@
 import { MoreHorizontal } from 'lucide-react'
 import { useState } from 'react'
-import type { Item } from '@/api/types'
+import type { Item, Status } from '@/api/types'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -21,6 +21,12 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { ItemActions } from './actions'
 
+const STATUS_ITEMS: { status: Status; label: string }[] = [
+  { status: 'in_use', label: '设为使用中' },
+  { status: 'watching', label: '设为关注中' },
+  { status: 'archived', label: '设为弃用' },
+]
+
 export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const archived = item.status === 'archived'
@@ -36,29 +42,32 @@ export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }
           <MoreHorizontal />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-36" onClick={(e) => e.stopPropagation()}>
-          {archived ? (
+          {/* Groups: pin | the other two statuses | edit | relations. An archived
+              item can only be moved back to a status or deleted. */}
+          {!archived && (
             <>
-              <DropdownMenuItem onClick={() => actions.setStatus(item, 'watching')}>恢复</DropdownMenuItem>
-              <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
-                删除
-              </DropdownMenuItem>
-            </>
-          ) : (
-            <>
-              {item.status !== 'in_use' && (
-                <DropdownMenuItem onClick={() => actions.setStatus(item, 'in_use')}>设为使用中</DropdownMenuItem>
-              )}
-              {item.status !== 'watching' && (
-                <DropdownMenuItem onClick={() => actions.setStatus(item, 'watching')}>设为关注中</DropdownMenuItem>
-              )}
               <DropdownMenuItem onClick={() => actions.togglePin(item)}>
                 {item.pinned ? '取消置顶' : '置顶'}
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
+            </>
+          )}
+          {STATUS_ITEMS.filter((s) => s.status !== item.status).map((s) => (
+            <DropdownMenuItem key={s.status} onClick={() => actions.setStatus(item, s.status)}>
+              {s.label}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          {archived ? (
+            <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
+              删除
+            </DropdownMenuItem>
+          ) : (
+            <>
               <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
               <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => actions.setStatus(item, 'archived')}>弃用</DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>

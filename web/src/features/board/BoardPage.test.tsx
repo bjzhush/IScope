@@ -400,7 +400,29 @@ test('closing a dirty drawer asks for confirmation', async () => {
   expect(requests.some((r) => r.method === 'PATCH')).toBe(false)
 })
 
-test('card menu: archive, restore, pin and delete with confirmation', async () => {
+test('card menu groups items with separators', async () => {
+  const user = userEvent.setup()
+  renderPage('/boards/ai-stack?archived=1')
+  await screen.findByRole('button', { name: 'Aider' })
+  // Menu entries and separators in order, separators as '|'.
+  const layout = async (name: string) => {
+    await user.click(screen.getByRole('button', { name: `${name} 菜单` }))
+    const menu = await screen.findByRole('menu')
+    const out = [...menu.querySelectorAll('[role=menuitem],[role=separator]')].map((el) =>
+      el.getAttribute('role') === 'separator' ? '|' : el.textContent,
+    )
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    return out
+  }
+  expect(await layout('Claude Code')).toEqual(
+    ['取消置顶', '|', '设为关注中', '设为弃用', '|', '编辑', '|', '编辑关联…', '聚焦关联'])
+  expect(await layout('OpenCode')).toEqual(
+    ['置顶', '|', '设为使用中', '设为弃用', '|', '编辑', '|', '编辑关联…', '聚焦关联'])
+  expect(await layout('Aider')).toEqual(['设为使用中', '设为关注中', '|', '删除'])
+})
+
+test('card menu: archive, set back to watching, pin and delete with confirmation', async () => {
   const user = userEvent.setup()
   renderPage('/boards/ai-stack?archived=1')
   await screen.findByRole('button', { name: 'Aider' })
@@ -410,11 +432,11 @@ test('card menu: archive, restore, pin and delete with confirmation', async () =
   await waitFor(() => expect(within(card('OpenCode')).getByLabelText('已置顶')).toBeInTheDocument())
 
   await user.click(screen.getByRole('button', { name: 'OpenCode 菜单' }))
-  await user.click(await screen.findByRole('menuitem', { name: '弃用' }))
+  await user.click(await screen.findByRole('menuitem', { name: '设为弃用' }))
   await waitFor(() => expect(within(card('OpenCode')).getByText('已弃用')).toBeInTheDocument())
 
   await user.click(screen.getByRole('button', { name: 'Aider 菜单' }))
-  await user.click(await screen.findByRole('menuitem', { name: '恢复' }))
+  await user.click(await screen.findByRole('menuitem', { name: '设为关注中' }))
   await waitFor(() => expect(within(card('Aider')).getByText('关注中')).toBeInTheDocument())
 
   await user.click(screen.getByRole('button', { name: 'OpenCode 菜单' }))
