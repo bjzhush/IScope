@@ -11,11 +11,13 @@ import { tagClass } from './TagStrip'
 const stop = (e: React.SyntheticEvent) => e.stopPropagation()
 
 // Info button that shows the summary, card fields, all tags and the links. It opens on hover over the
-// button itself, and a click pins it open (the only way on touch screens).
-export function CardDetails({ item, fields }: { item: Item; fields: Field[] }) {
-  const details = cardDetails(fields, item)
+// button itself, and a click pins it open (the only way on touch screens). With full (snapshot
+// preview, where the drawer cannot open) it lists every field with a value and the notes too.
+export function CardDetails({ item, fields, full = false }: { item: Item; fields: Field[]; full?: boolean }) {
+  const details = cardDetails(fields, item, full)
   const links = item.links.filter((l) => isHttpUrl(l.url))
-  if (!item.summary && details.length === 0 && item.tags.length === 0 && links.length === 0) return null
+  const notes = full ? item.notes.trim() : ''
+  if (!item.summary && details.length === 0 && item.tags.length === 0 && links.length === 0 && !notes) return null
 
   return (
     <Popover>
@@ -66,6 +68,12 @@ export function CardDetails({ item, fields }: { item: Item; fields: Field[] }) {
               </li>
             ))}
           </ul>
+        )}
+        {notes && (
+          <div className="grid gap-0.5 border-t pt-2 text-xs">
+            <span className="text-muted-foreground">笔记</span>
+            <p className="whitespace-pre-wrap break-words">{notes}</p>
+          </div>
         )}
       </PopoverContent>
     </Popover>

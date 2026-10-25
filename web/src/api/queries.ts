@@ -9,18 +9,32 @@ export const queryKeys = {
   boardAll: (key: string) => ['board', key] as const,
   board: (key: string, includeArchived: boolean) => ['board', key, { includeArchived }] as const,
   item: (id: string) => ['item', id] as const,
+  snapshots: ['snapshots'] as const,
+  snapshotBoard: (id: string, key: string) => ['snapshot', id, key] as const,
 }
 
 export function useKinds() {
   return useQuery({ queryKey: queryKeys.kinds, queryFn: api.kinds, staleTime: Infinity })
 }
 
-export function useBoard(key: string, includeArchived: boolean) {
+export function useBoard(key: string, includeArchived: boolean, enabled = true) {
   return useQuery({
     queryKey: queryKeys.board(key, includeArchived),
     queryFn: () => api.board(key, includeArchived),
+    enabled,
     // Keep cards on screen while a different board or archive setting loads.
     placeholderData: keepPreviousData,
+  })
+}
+
+// A snapshot never changes, so its board is fetched once.
+export function useSnapshotBoard(id: string, key: string, enabled: boolean) {
+  return useQuery({
+    queryKey: queryKeys.snapshotBoard(id, key),
+    queryFn: () => api.snapshotBoard(id, key),
+    enabled,
+    staleTime: Infinity,
+    retry: false,
   })
 }
 

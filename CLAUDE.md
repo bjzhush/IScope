@@ -74,6 +74,13 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - A kind without fields has no {kind} 字段 section.
 28. The card menu (`ItemMenu.tsx`) is grouped with separators. For an active item the groups are: 置顶 / 取消置顶 | the two other statuses (设为使用中 / 设为关注中 / 设为弃用) | 编辑 | 编辑关联… and 聚焦关联. An archived item has no pin, edit or relation entries, only 设为使用中 / 设为关注中 | 删除. This replaces the menu's old 恢复 entry, so an archived item can now go straight back to 使用中; the drawer's 恢复 button still sets 关注中 (decision 3).
 
+29. Snapshots (`internal/snapshot`, migration `0004_snapshots.sql`) save the whole board in the export format (`transfer.Document`). The item and relation counts are stored beside it, so listing never reads the document.
+    - `GET/POST /api/v1/snapshots`, `GET /snapshots/{id}/download` (an export file that 导入 JSON accepts), `GET /snapshots/{id}/boards/{key}`, `DELETE /snapshots/{id}`. An empty label becomes 手动快照; labels are at most 100 characters.
+    - The board endpoint rebuilds a `board.View` plus `snapshot` meta. Items get stand-in IDs `kind:slug` and relations `type:from:to`. Only the board's kinds are kept, archived items included, and fields show by the current registry.
+    - An import that changes something saves a 导入 JSON 前 snapshot inside its transaction (`transfer.Snapshotter`), so a failed import leaves none. The board is exported before the transaction starts, because the pool has one connection.
+    - The preview is `BoardPage` at `/boards/:key/snapshots/:snapshotId` in read-only mode. It never fetches the live board. It keeps search, the status filter, hover linking, edge hints and focus mode. It drops the add buttons, dragging, the drawer, relation mode and the 数据 menu. Cards are not clickable, their menu has only 聚焦关联, and the details popover lists every field with a value plus the notes.
+    - The list is a dialog under 数据 → 快照…. The shadcn `AlertDialogAction` here is a plain button, so a confirm handler must close the dialog itself.
+
 ## Implementation notes
 
 - Domain errors live in `internal/apperr`. Services return them, and `httpx.WriteError` maps them to HTTP status codes, so services never import `httpx`.

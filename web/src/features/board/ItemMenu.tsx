@@ -27,7 +27,8 @@ const STATUS_ITEMS: { status: Status; label: string }[] = [
   { status: 'archived', label: '设为弃用' },
 ]
 
-export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }) {
+// readOnly (snapshot preview) leaves only 聚焦关联, which changes the URL, not data.
+export function ItemMenu({ item, actions, readOnly = false }: { item: Item; actions: ItemActions; readOnly?: boolean }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const archived = item.status === 'archived'
 
@@ -44,30 +45,36 @@ export function ItemMenu({ item, actions }: { item: Item; actions: ItemActions }
         <DropdownMenuContent align="end" className="w-36" onClick={(e) => e.stopPropagation()}>
           {/* Groups: pin | the other two statuses | edit | relations. An archived
               item can only be moved back to a status or deleted. */}
-          {!archived && (
-            <>
-              <DropdownMenuItem onClick={() => actions.togglePin(item)}>
-                {item.pinned ? '取消置顶' : '置顶'}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-            </>
-          )}
-          {STATUS_ITEMS.filter((s) => s.status !== item.status).map((s) => (
-            <DropdownMenuItem key={s.status} onClick={() => actions.setStatus(item, s.status)}>
-              {s.label}
-            </DropdownMenuItem>
-          ))}
-          <DropdownMenuSeparator />
-          {archived ? (
-            <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
-              删除
-            </DropdownMenuItem>
+          {readOnly ? (
+            <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>
           ) : (
             <>
-              <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
+              {!archived && (
+                <>
+                  <DropdownMenuItem onClick={() => actions.togglePin(item)}>
+                    {item.pinned ? '取消置顶' : '置顶'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {STATUS_ITEMS.filter((s) => s.status !== item.status).map((s) => (
+                <DropdownMenuItem key={s.status} onClick={() => actions.setStatus(item, s.status)}>
+                  {s.label}
+                </DropdownMenuItem>
+              ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>
+              {archived ? (
+                <DropdownMenuItem variant="destructive" onClick={() => setConfirmDelete(true)}>
+                  删除
+                </DropdownMenuItem>
+              ) : (
+                <>
+                  <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>
+                </>
+              )}
             </>
           )}
         </DropdownMenuContent>

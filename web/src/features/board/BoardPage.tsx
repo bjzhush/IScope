@@ -1,14 +1,16 @@
-import { X } from 'lucide-react'
+import { History, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useParams } from 'react-router'
-import { useBoard, useDeleteItem, useKinds, useMoveItem, useQuickUpdate, useSetLinks } from '@/api/queries'
+import { useNavigate, useParams } from 'react-router'
+import { useBoard, useDeleteItem, useKinds, useMoveItem, useQuickUpdate, useSetLinks, useSnapshotBoard } from '@/api/queries'
 import type { Item, Kind, Relation } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { CatalogDialog } from '@/features/catalog/CatalogDialog'
 import { ItemSheet } from '@/features/editor/ItemSheet'
+import { SnapshotsDialog } from '@/features/snapshot/SnapshotsDialog'
 import { DEFAULT_STATUSES, matchesFilter, statusCounts } from '@/lib/filter'
 import { buildAdjacency, focusLayers, otherEnd, relationTypeBetween } from '@/lib/relations'
+import { formatLocalMinute } from '@/lib/format'
 import { compareItems } from '@/lib/sort'
 import { useMediaQuery } from '@/lib/useMediaQuery'
 import type { ItemActions } from './actions'
@@ -35,12 +37,17 @@ function useSettledHover() {
 }
 
 export function BoardPage() {
-  const { key = '' } = useParams()
+  const { key = '', snapshotId } = useParams()
+  // Snapshot preview: the same page over a saved board, with every write off.
+  const readOnly = snapshotId !== undefined
+  const navigate = useNavigate()
   const f = useBoardFilters()
   const kinds = useKinds()
   // Always fetch archived items too: the toolbar counts them, and relation mode
   // must see links to them so a toggle never drops those links.
-  const board = useBoard(key, true)
+  const live = useBoard(key, true, !readOnly)
+  const snapshot = useSnapshotBoard(snapshotId ?? '', key, readOnly)
+  const board = readOnly ? snapshot : live
   const quick = useQuickUpdate(key)
   const del = useDeleteItem(key)
   const move = useMoveItem(key)
@@ -48,6 +55,7 @@ export function BoardPage() {
   const narrow = useMediaQuery('(max-width: 899px)')
   const [tab, setTab] = useState<string | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [hovered, setHovered] = useSettledHover()
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
 
@@ -190,9 +198,19 @@ export function BoardPage() {
     },
   }
 
+  const backToBoard = () => navigate(`/boards/${encodeURIComponent(key)}`)
   const error = kinds.error ?? board.error
   if (error) {
-    return <p className="p-6 text-destructive">加载失败：{error.message}</p>
+    return (
+      <div className="flex items-center gap-3 p-6">
+        <p className="text-destructive">加载失败：{error.message}</p>
+        {readOnly && (
+          <Button size="sm" variant="outline" onClick={backToBoard}>
+            返回当前看板
+          </Button>
+        )}
+      </div>
+    )
   }
   if (!kinds.data || !board.data) {
     return <p className="p-6 text-muted-foreground">加载中…</p>
@@ -208,11 +226,12 @@ export function BoardPage() {
       filtered={filtered}
       actions={actions}
       onAdd={() => f.openNew(kind.key)}
+      readOnly={readOnly}
       emphasis={emphasis}
       onHover={setHovered}
       onMove={(id, plan) => move.mutate({ id, input: plan.input, sortOrder: plan.sortOrder })}
       linking={linking(kind)}
-      sortable={!linkSource && !focusItem}
+      sortable={!readOnly && !linkSource && !focusItem}
       emptyText={focusItem && kind.key !== focusItem.kind ? `没有与 ${focusItem.name} 关联的 ${kind.label}` : undefined}
       hintTargets={hovered && items.some((it) => it.id === hovered) ? null : hoveredNeighbors}
     />
@@ -227,8 +246,24 @@ export function BoardPage() {
         onQuery={f.setQuery}
         counts={counts}
         onStatuses={f.setStatuses}
-        extra={<DataMenu onCatalog={() => setCatalogOpen(true)} />}
+        extra={
+          readOnly ? undefined : (
+            <DataMenu onCatalog={() => setCatalogOpen(true)} onSnapshots={() => setSnapshotsOpen(true)} />
+          )
+        }
       />
+      {snapshot.data && readOnly && (
+        <div role="status" aria-label="快照预览" className="flex items-center gap-3 border-b bg-amber-500/10 px-4 py-2 text-sm">
+          <History className="size-4 shrink-0 text-amber-600" />
+          <span className="min-w-0 flex-1">
+            正在查看快照：<strong>{snapshot.data.snapshot.label}</strong> · {formatLocalMinute(snapshot.data.snapshot.createdAt)}
+            （只读）
+          </span>
+          <Button size="sm" onClick={backToBoard}>
+            返回当前看板
+          </Button>
+        </div>
+      )}
       {linkSource && (
         <div role="status" aria-label="关联模式" className="flex items-center gap-3 border-b bg-primary/5 px-4 py-2 text-sm">
           <span className="min-w-0 flex-1">
@@ -272,21 +307,26 @@ export function BoardPage() {
           {columns.map(renderColumn)}
         </main>
       )}
-      <ItemSheet
-        boardKey={key}
-        kinds={kindByKey}
-        columns={board.data.board.columns}
-        relationTypes={kinds.data.relationTypes}
-        editingId={f.editingId}
-        newKind={f.newKind}
-        onClose={f.closeSheet}
-      />
-      <CatalogDialog
-        open={catalogOpen}
-        onOpenChange={setCatalogOpen}
-        items={board.data.items}
-        onImported={(id) => f.openItem(id)}
-      />
+      {!readOnly && (
+        <>
+          <ItemSheet
+            boardKey={key}
+            kinds={kindByKey}
+            columns={board.data.board.columns}
+            relationTypes={kinds.data.relationTypes}
+            editingId={f.editingId}
+            newKind={f.newKind}
+            onClose={f.closeSheet}
+          />
+          <CatalogDialog
+            open={catalogOpen}
+            onOpenChange={setCatalogOpen}
+            items={board.data.items}
+            onImported={(id) => f.openItem(id)}
+          />
+          <SnapshotsDialog boardKey={key} open={snapshotsOpen} onOpenChange={setSnapshotsOpen} />
+        </>
+      )}
     </div>
   )
 }

@@ -38,6 +38,10 @@ type Summary struct {
 	Relations Counts `json:"relations"`
 }
 
+func (s Summary) changed() bool {
+	return s.Items.Created+s.Items.Updated+s.Relations.Created+s.Relations.Updated > 0
+}
+
 func (c *Counts) add(result string) {
 	switch result {
 	case "created":
@@ -54,7 +58,17 @@ type Service struct {
 	items     *item.Service
 	relations *relation.Service
 	now       func() time.Time
+	snapshots Snapshotter
 }
+
+// Snapshotter records the board as it was before an import, inside the
+// import's transaction (implemented by internal/snapshot).
+type Snapshotter interface {
+	CreateTx(ctx context.Context, q *db.Queries, doc Document, label string) error
+}
+
+// SetSnapshotter makes every import that changes something save a snapshot first.
+func (s *Service) SetSnapshotter(sn Snapshotter) { s.snapshots = sn }
 
 func NewService(sqldb *sql.DB, items *item.Service, relations *relation.Service) *Service {
 	return &Service{db: sqldb, items: items, relations: relations, now: time.Now}
@@ -106,6 +120,16 @@ func relKey(r relation.Portable) string {
 func (s *Service) Import(ctx context.Context, doc Document) (Summary, error) {
 	if doc.Version != Version {
 		return Summary{}, apperr.New(apperr.BadRequest, fmt.Sprintf("不支持的文件版本 %d，应为 %d", doc.Version, Version))
+	}
+	// Read the current board before the transaction: the pool has a single
+	// connection, so the services cannot read while the transaction holds it.
+	// Nothing else can write in between for the same reason.
+	var before Document
+	if s.snapshots != nil {
+		var err error
+		if before, err = s.Export(ctx); err != nil {
+			return Summary{}, err
+		}
 	}
 	var sum Summary
 	now := s.now().UTC().Format(time.RFC3339)
@@ -176,6 +200,10 @@ func (s *Service) Import(ctx context.Context, doc Document) (Summary, error) {
 
 		if len(errs) > 0 {
 			return apperr.Validation(errs)
+		}
+		// Written last, so a failed import leaves no snapshot behind.
+		if s.snapshots != nil && sum.changed() {
+			return s.snapshots.CreateTx(ctx, q, before, "导入 JSON 前")
 		}
 		return nil
 	})

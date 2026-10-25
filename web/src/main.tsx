@@ -20,6 +20,7 @@ createRoot(document.getElementById('root')!).render(
         <BrowserRouter>
           <Routes>
             <Route path="/boards/:key" element={<BoardPage />} />
+            <Route path="/boards/:key/snapshots/:snapshotId" element={<BoardPage />} />
             <Route path="*" element={<Navigate to="/boards/ai-stack" replace />} />
           </Routes>
         </BrowserRouter>

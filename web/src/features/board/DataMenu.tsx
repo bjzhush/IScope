@@ -15,7 +15,7 @@ import {
 
 const counts = (c: ImportSummary['items']) => `新增 ${c.created}、更新 ${c.updated}、未变 ${c.unchanged}`
 
-export function DataMenu({ onCatalog }: { onCatalog: () => void }) {
+export function DataMenu({ onCatalog, onSnapshots }: { onCatalog: () => void; onSnapshots: () => void }) {
   const qc = useQueryClient()
   const fileInput = useRef<HTMLInputElement>(null)
 
@@ -32,6 +32,7 @@ export function DataMenu({ onCatalog }: { onCatalog: () => void }) {
       toast.success('导入完成', { description: `条目：${counts(sum.items)}；关联：${counts(sum.relations)}` })
       qc.invalidateQueries({ queryKey: ['board'] })
       qc.invalidateQueries({ queryKey: ['item'] })
+      qc.invalidateQueries({ queryKey: ['snapshots'] }) // an import that changed something saved one
     } catch (e) {
       const fields = e instanceof ApiError ? Object.entries(e.fields) : []
       toast.error(`导入失败：${e instanceof Error ? e.message : String(e)}`, {
@@ -54,6 +55,7 @@ export function DataMenu({ onCatalog }: { onCatalog: () => void }) {
         <DropdownMenuContent align="end" className="w-48">
           <DropdownMenuItem render={<a href={api.exportUrl} download />}>导出 JSON</DropdownMenuItem>
           <DropdownMenuItem onClick={() => fileInput.current?.click()}>导入 JSON…</DropdownMenuItem>
+          <DropdownMenuItem onClick={onSnapshots}>快照…</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onCatalog}>从 models.dev 导入模型…</DropdownMenuItem>
         </DropdownMenuContent>

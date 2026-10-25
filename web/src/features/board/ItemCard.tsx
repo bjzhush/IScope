@@ -30,6 +30,8 @@ export interface ItemCardProps {
   select?: Selectable
   // Relation mode: no menu, no drawer, no dragging.
   linking?: boolean
+  // Snapshot preview: not clickable, full details, and a menu with 聚焦关联 only.
+  readOnly?: boolean
   // Supplied by the sortable wrapper.
   ref?: React.Ref<HTMLElement>
   style?: React.CSSProperties
@@ -40,19 +42,20 @@ export interface ItemCardProps {
 }
 
 export function ItemCard(props: ItemCardProps) {
-  const { item, fields, actions, emphasis, onHover, select, linking, ref, style, dragging, dragHandleProps, dragHint } = props
+  const { item, fields, actions, emphasis, onHover, select, linking, readOnly, ref, style, dragging, dragHandleProps, dragHint } =
+    props
   const activate = () => {
     if (select) select.onToggle()
-    else if (!linking) actions.edit(item)
+    else if (!linking && !readOnly) actions.edit(item)
   }
 
   return (
     <article
       ref={ref}
       style={style}
-      role={select ? 'checkbox' : 'button'}
+      role={select ? 'checkbox' : readOnly ? undefined : 'button'}
       aria-checked={select ? select.checked : undefined}
-      tabIndex={linking && !select ? -1 : 0}
+      tabIndex={readOnly || (linking && !select) ? -1 : 0}
       aria-label={item.name}
       data-emphasis={emphasis}
       data-item-id={item.id}
@@ -72,7 +75,7 @@ export function ItemCard(props: ItemCardProps) {
         emphasis === 'selected' && 'border-primary ring-2 ring-primary',
         emphasis === 'indirect' && 'border-dashed border-primary/70',
         select?.checked && 'border-primary bg-primary/5',
-        linking && !select && 'cursor-default',
+        ((linking && !select) || readOnly) && 'cursor-default',
         dragging && 'z-10 opacity-80 shadow-lg',
       )}
     >
@@ -106,10 +109,10 @@ export function ItemCard(props: ItemCardProps) {
         )}
         <h3 className="min-w-0 flex-1 truncate font-medium">{item.name}</h3>
         <TagStrip tags={item.tags} />
-        <CardDetails item={item} fields={fields} />
+        <CardDetails item={item} fields={fields} full={readOnly} />
         {item.pinned && <Pin aria-label="已置顶" className="size-3.5 shrink-0 text-muted-foreground" />}
         <Badge className={cn('shrink-0', statusBadgeClass[item.status])}>{statusLabel(item.status)}</Badge>
-        {!linking && <ItemMenu item={item} actions={actions} />}
+        {!linking && <ItemMenu item={item} actions={actions} readOnly={readOnly} />}
       </div>
     </article>
   )

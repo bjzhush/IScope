@@ -36,3 +36,12 @@ type Relation struct {
 	CreatedAt string
 	UpdatedAt string
 }
+
+type Snapshot struct {
+	ID            string
+	Label         string
+	ItemCount     int64
+	RelationCount int64
+	Doc           string
+	CreatedAt     string
+}

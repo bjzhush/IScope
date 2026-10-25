@@ -140,6 +140,19 @@ export interface TransferCounts {
   unchanged: number
 }
 
+export interface SnapshotMeta {
+  id: string
+  label: string
+  itemCount: number
+  relationCount: number
+  createdAt: string
+}
+
+// A board as it was in a snapshot; item and relation IDs are stand-ins.
+export interface SnapshotBoardView extends BoardView {
+  snapshot: SnapshotMeta
+}
+
 export interface ImportSummary {
   items: TransferCounts
   relations: TransferCounts

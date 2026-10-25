@@ -20,6 +20,7 @@ import (
 	"github.com/bjzhush/ai-overview/internal/kind"
 	"github.com/bjzhush/ai-overview/internal/relation"
 	"github.com/bjzhush/ai-overview/internal/seed"
+	"github.com/bjzhush/ai-overview/internal/snapshot"
 	"github.com/bjzhush/ai-overview/internal/store"
 	"github.com/bjzhush/ai-overview/internal/transfer"
 	"github.com/bjzhush/ai-overview/web"
@@ -83,7 +84,11 @@ func newHandler(sqldb *sql.DB, reg *kind.Registry, items *item.Service, relation
 	item.NewHandler(items, relations).Register(mux)
 	relation.NewHandler(relations).Register(mux)
 	board.NewHandler(board.NewService(reg, items, relations)).Register(mux)
-	transfer.NewHandler(transfer.NewService(sqldb, items, relations)).Register(mux)
+	tr := transfer.NewService(sqldb, items, relations)
+	snapshots := snapshot.NewService(sqldb, reg, tr)
+	tr.SetSnapshotter(snapshots) // every import that changes something saves a snapshot first
+	transfer.NewHandler(tr).Register(mux)
+	snapshot.NewHandler(snapshots).Register(mux)
 	source := catalog.NewSource(catalogURL)
 	catalog.NewHandler(source, catalog.NewImporter(source, reg, items, relations)).Register(mux)
 	mux.HandleFunc("/api/", httpx.NotFoundAPI)

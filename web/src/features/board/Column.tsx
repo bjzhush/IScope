@@ -38,6 +38,8 @@ interface Props {
   linking: null | ((item: Item) => Selectable | undefined)
   // Drag sorting is off in relation and focus mode.
   sortable: boolean
+  // Snapshot preview: no add button, and read-only cards.
+  readOnly?: boolean
   // Replaces the empty-column text, e.g. in focus mode.
   emptyText?: string
   // Hover linking: the hovered card's neighbours when they may be in this
@@ -59,7 +61,8 @@ function groups(items: Item[]): Item[][] {
 }
 
 export function Column(props: Props) {
-  const { kind, items, filtered, actions, onAdd, emphasis, onHover, onMove, linking, sortable, emptyText, hintTargets } = props
+  const { kind, items, filtered, actions, onAdd, emphasis, onHover, onMove, linking, sortable, readOnly, emptyText, hintTargets } =
+    props
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
@@ -95,9 +98,11 @@ export function Column(props: Props) {
         <KindIcon name={kind.icon} className="size-4 text-muted-foreground" />
         <h2 className="font-medium">{kind.label}</h2>
         <span className="text-sm text-muted-foreground">{items.length}</span>
-        <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={`新增 ${kind.label}`} onClick={onAdd}>
-          <Plus />
-        </Button>
+        {!readOnly && (
+          <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={`新增 ${kind.label}`} onClick={onAdd}>
+            <Plus />
+          </Button>
+        )}
       </div>
       <div className="relative flex min-h-0 flex-col">
         <div ref={scroller} className="flex min-h-0 flex-col gap-2 overflow-y-auto">
@@ -114,6 +119,7 @@ export function Column(props: Props) {
                     emphasis={emphasis(it)}
                     onHover={onHover}
                     linking={!!linking}
+                    readOnly={readOnly}
                     select={linking?.(it)}
                     // A card alone in its group cannot be dragged, but still
                     // takes drops, so a drop onto it can explain the rule.
@@ -131,6 +137,8 @@ export function Column(props: Props) {
                 <p>{emptyText}</p>
               ) : filtered ? (
                 <p>没有符合筛选条件的 {kind.label}</p>
+              ) : readOnly ? (
+                <p>快照里没有 {kind.label}</p>
               ) : (
                 <>
                   <p>还没有 {kind.label}，记录一个你正在使用或关注的吧</p>

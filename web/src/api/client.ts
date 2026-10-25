@@ -11,6 +11,8 @@ import type {
   MoveInput,
   Relation,
   RelationLink,
+  SnapshotBoardView,
+  SnapshotMeta,
 } from './types'
 
 const BASE = '/api/v1'
@@ -61,4 +63,10 @@ export const api = {
     request<CatalogSearch>('GET', `/catalog?${new URLSearchParams({ q, provider })}`),
   catalogImport: (input: { providerId: string; modelId: string; linkTo?: string }) =>
     request<CatalogImportResult>('POST', '/catalog/import', input),
+  snapshots: () => request<SnapshotMeta[]>('GET', '/snapshots'),
+  createSnapshot: (label: string) => request<SnapshotMeta>('POST', '/snapshots', { label }),
+  deleteSnapshot: (id: string) => request<void>('DELETE', `/snapshots/${encodeURIComponent(id)}`),
+  snapshotDownloadUrl: (id: string) => `${BASE}/snapshots/${encodeURIComponent(id)}/download`,
+  snapshotBoard: (id: string, key: string) =>
+    request<SnapshotBoardView>('GET', `/snapshots/${encodeURIComponent(id)}/boards/${encodeURIComponent(key)}`),
 }
