@@ -14,12 +14,13 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { ArrowDown, ArrowUp, Plus } from 'lucide-react'
+import { ArrowDown, ArrowUp, Download, Plus } from 'lucide-react'
 import { useLayoutEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { Item, Kind } from '@/api/types'
 import { KindIcon } from '@/components/KindIcon'
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { offscreen } from '@/lib/offscreen'
 import { crossesGroups, DRAG_RULE, groupKey, type MovePlan, planMove } from '@/lib/reorder'
 import type { ItemActions } from './actions'
@@ -31,6 +32,8 @@ interface Props {
   filtered: boolean // a search or status filter is active
   actions: ItemActions
   onAdd: () => void
+  // Import from the models.dev catalog; set for Kind.catalogImport columns.
+  onImport?: () => void
   emphasis: (item: Item) => Emphasis
   onHover: (id: string | null) => void
   onMove: (id: string, plan: MovePlan) => void
@@ -61,7 +64,7 @@ function groups(items: Item[]): Item[][] {
 }
 
 export function Column(props: Props) {
-  const { kind, items, filtered, actions, onAdd, emphasis, onHover, onMove, linking, sortable, readOnly, emptyText, hintTargets } =
+  const { kind, items, filtered, actions, onAdd, onImport, emphasis, onHover, onMove, linking, sortable, readOnly, emptyText, hintTargets } =
     props
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -99,9 +102,21 @@ export function Column(props: Props) {
         <h2 className="font-medium">{kind.label}</h2>
         <span className="text-sm text-muted-foreground">{items.length}</span>
         {!readOnly && (
-          <Button variant="ghost" size="icon-sm" className="ml-auto" aria-label={`新增 ${kind.label}`} onClick={onAdd}>
-            <Plus />
-          </Button>
+          <div className="ml-auto flex items-center">
+            {onImport && (
+              <Tooltip>
+                <TooltipTrigger
+                  render={<Button variant="ghost" size="icon-sm" aria-label={`导入 ${kind.label}`} onClick={onImport} />}
+                >
+                  <Download />
+                </TooltipTrigger>
+                <TooltipContent>从 models.dev 或模型页链接导入</TooltipContent>
+              </Tooltip>
+            )}
+            <Button variant="ghost" size="icon-sm" aria-label={`新增 ${kind.label}`} onClick={onAdd}>
+              <Plus />
+            </Button>
+          </div>
         )}
       </div>
       <div className="relative flex min-h-0 flex-col">
@@ -120,6 +135,7 @@ export function Column(props: Props) {
                     onHover={onHover}
                     linking={!!linking}
                     readOnly={readOnly}
+                    catalog={!!kind.catalogImport}
                     select={linking?.(it)}
                     // A card alone in its group cannot be dragged, but still
                     // takes drops, so a drop onto it can explain the rule.

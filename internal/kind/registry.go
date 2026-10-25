@@ -51,6 +51,9 @@ type Kind struct {
 	Label  string  `json:"label"`
 	Icon   string  `json:"icon"` // lucide-react icon name
 	Fields []Field `json:"fields"`
+	// CatalogImport: items of this kind can be imported and updated from the
+	// models.dev catalog (internal/catalog writes this kind).
+	CatalogImport bool `json:"catalogImport,omitempty"`
 }
 
 type RelationType struct {

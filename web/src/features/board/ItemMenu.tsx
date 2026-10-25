@@ -27,8 +27,16 @@ const STATUS_ITEMS: { status: Status; label: string }[] = [
   { status: 'archived', label: '设为弃用' },
 ]
 
-// readOnly (snapshot preview) leaves only 聚焦关联, which changes the URL, not data.
-export function ItemMenu({ item, actions, readOnly = false }: { item: Item; actions: ItemActions; readOnly?: boolean }) {
+interface Props {
+  item: Item
+  actions: ItemActions
+  // Snapshot preview: only 聚焦关联, which changes the URL, not data.
+  readOnly?: boolean
+  // The item's kind takes catalog updates (Kind.catalogImport).
+  catalog?: boolean
+}
+
+export function ItemMenu({ item, actions, readOnly = false, catalog = false }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const archived = item.status === 'archived'
 
@@ -70,6 +78,9 @@ export function ItemMenu({ item, actions, readOnly = false }: { item: Item; acti
               ) : (
                 <>
                   <DropdownMenuItem onClick={() => actions.edit(item)}>编辑</DropdownMenuItem>
+                  {catalog && (
+                    <DropdownMenuItem onClick={() => actions.updateFromCatalog(item)}>从链接更新…</DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => actions.link(item)}>编辑关联…</DropdownMenuItem>
                   <DropdownMenuItem onClick={() => actions.focus(item)}>聚焦关联</DropdownMenuItem>

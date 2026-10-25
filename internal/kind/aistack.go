@@ -11,7 +11,7 @@ func RegisterAIStack(r *Registry) {
 	})
 
 	r.RegisterKind(Kind{
-		Key: "model", Label: "Model", Icon: "brain",
+		Key: "model", Label: "Model", Icon: "brain", CatalogImport: true,
 		Fields: []Field{
 			{Key: "vendor", Label: "出品方", Type: FieldText, Required: true, ShowOnCard: true},
 			{Key: "model_id", Label: "模型 ID", Type: FieldText, Placeholder: "官方 API 中的模型字符串"},

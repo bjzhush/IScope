@@ -55,6 +55,12 @@ export function BoardPage() {
   const narrow = useMediaQuery('(max-width: 899px)')
   const [tab, setTab] = useState<string | null>(null)
   const [catalogOpen, setCatalogOpen] = useState(false)
+  // The item 从链接更新… overwrites; null imports a new or matching model.
+  const [catalogTarget, setCatalogTarget] = useState<Item | null>(null)
+  const openCatalog = (target: Item | null) => {
+    setCatalogTarget(target)
+    setCatalogOpen(true)
+  }
   const [snapshotsOpen, setSnapshotsOpen] = useState(false)
   const [hovered, setHovered] = useSettledHover()
   const [linkSourceId, setLinkSourceId] = useState<string | null>(null)
@@ -196,6 +202,7 @@ export function BoardPage() {
       setLinkSourceId(null)
       f.setFocus(it.id)
     },
+    updateFromCatalog: (it) => openCatalog(it),
   }
 
   const backToBoard = () => navigate(`/boards/${encodeURIComponent(key)}`)
@@ -226,6 +233,7 @@ export function BoardPage() {
       filtered={filtered}
       actions={actions}
       onAdd={() => f.openNew(kind.key)}
+      onImport={kind.catalogImport ? () => openCatalog(null) : undefined}
       readOnly={readOnly}
       emphasis={emphasis}
       onHover={setHovered}
@@ -248,7 +256,7 @@ export function BoardPage() {
         onStatuses={f.setStatuses}
         extra={
           readOnly ? undefined : (
-            <DataMenu onCatalog={() => setCatalogOpen(true)} onSnapshots={() => setSnapshotsOpen(true)} />
+            <DataMenu onCatalog={() => openCatalog(null)} onSnapshots={() => setSnapshotsOpen(true)} />
           )
         }
       />
@@ -319,6 +327,9 @@ export function BoardPage() {
             onClose={f.closeSheet}
           />
           <CatalogDialog
+            boardKey={key}
+            target={catalogTarget}
+            targetFields={catalogTarget ? kindByKey.get(catalogTarget.kind)?.fields : undefined}
             open={catalogOpen}
             onOpenChange={setCatalogOpen}
             items={board.data.items}

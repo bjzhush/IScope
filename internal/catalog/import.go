@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/bjzhush/ai-overview/internal/apperr"
@@ -25,6 +26,9 @@ type ImportInput struct {
 	// LinkTo is an optional Provider item to link with offered_by, carrying
 	// this catalog provider's prices.
 	LinkTo string `json:"linkTo"`
+	// SourceURL is the model page the entry was found from; it is kept as one
+	// of the item's links.
+	SourceURL string `json:"sourceUrl"`
 }
 
 type ImportResult struct {
@@ -49,6 +53,9 @@ func NewImporter(source *Source, reg *kind.Registry, items *item.Service, relati
 // other fields and attrs are kept. With LinkTo, the offered_by relation gets
 // this provider's prices, plus its own model id when that differs.
 func (im *Importer) Import(ctx context.Context, in ImportInput) (ImportResult, error) {
+	if err := checkSourceURL(in.SourceURL); err != nil {
+		return ImportResult{}, err
+	}
 	e, err := im.source.Find(ctx, in.ProviderID, in.ModelID)
 	if err != nil {
 		return ImportResult{}, err
@@ -68,9 +75,18 @@ func (im *Importer) Import(ctx context.Context, in ImportInput) (ImportResult, e
 	}
 	var res ImportResult
 	if existing != nil {
-		res.Item, err = im.items.Update(ctx, existing.ID, item.Patch{Attrs: attrs})
+		patch := item.Patch{Attrs: attrs}
+		if in.SourceURL != "" {
+			links := withSourceLink(existing.Links, e, in.SourceURL)
+			patch.Links = &links
+		}
+		res.Item, err = im.items.Update(ctx, existing.ID, patch)
 	} else {
-		res.Item, err = im.items.Create(ctx, item.CreateInput{Kind: modelKind, Name: e.Name, Attrs: attrs})
+		create := item.CreateInput{Kind: modelKind, Name: e.Name, Attrs: attrs}
+		if in.SourceURL != "" {
+			create.Links = withSourceLink(nil, e, in.SourceURL)
+		}
+		res.Item, err = im.items.Create(ctx, create)
 		res.Created = true
 	}
 	if err != nil {
@@ -156,18 +172,56 @@ func (im *Importer) findModel(ctx context.Context, e Entry) (*item.Item, error) 
 	return nil, nil
 }
 
+func checkSourceURL(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if _, ok := parseLink(raw); !ok {
+		return apperr.Validation(map[string]string{"sourceUrl": "必须是 http 或 https 链接"})
+	}
+	return nil
+}
+
+// withSourceLink adds the model page to links: unchanged when that URL is
+// already there, replacing the first link on the same host (an older version's
+// page), appended otherwise. models.dev pages are labelled "models.dev", other
+// pages by the catalog provider.
+func withSourceLink(links []item.Link, e Entry, raw string) []item.Link {
+	raw = strings.TrimSpace(raw)
+	label := e.ProviderName
+	host := hostOf(raw)
+	if host == "models.dev" {
+		label = "models.dev"
+	}
+	out := append([]item.Link{}, links...)
+	for _, l := range out {
+		if l.URL == raw {
+			return out
+		}
+	}
+	for i, l := range out {
+		if hostOf(l.URL) == host {
+			out[i] = item.Link{Label: label, URL: raw}
+			return out
+		}
+	}
+	return append(out, item.Link{Label: label, URL: raw})
+}
+
 type Handler struct {
 	source   *Source
 	importer *Importer
+	updater  *Updater
 }
 
-func NewHandler(source *Source, importer *Importer) *Handler {
-	return &Handler{source: source, importer: importer}
+func NewHandler(source *Source, importer *Importer, updater *Updater) *Handler {
+	return &Handler{source: source, importer: importer, updater: updater}
 }
 
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/catalog", httpx.Handle(h.search))
 	mux.HandleFunc("POST /api/v1/catalog/import", httpx.Handle(h.importModel))
+	mux.HandleFunc("POST /api/v1/catalog/update", httpx.Handle(h.updateModel))
 }
 
 // searchResponse tells the client which kinds an import writes, so the UI can
@@ -201,5 +255,18 @@ func (h *Handler) importModel(w http.ResponseWriter, r *http.Request) error {
 		status = http.StatusCreated
 	}
 	httpx.Write(w, status, res)
+	return nil
+}
+
+func (h *Handler) updateModel(w http.ResponseWriter, r *http.Request) error {
+	var in UpdateInput
+	if err := httpx.Decode(r, &in); err != nil {
+		return err
+	}
+	res, err := h.updater.Update(r.Context(), in)
+	if err != nil {
+		return err
+	}
+	httpx.Write(w, http.StatusOK, res)
 	return nil
 }

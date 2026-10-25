@@ -72,13 +72,39 @@ async function fakeFetch(input: RequestInfo | URL, init?: RequestInit): Promise<
   }
   if (url.pathname === '/api/v1/catalog') {
     const q = (url.searchParams.get('q') ?? '').toLowerCase()
-    const entries = catalogEntries.filter((e) => e.name.toLowerCase().includes(q))
+    // A model page link resolves to the one entry its path names.
+    const linked = q.startsWith('http') ? catalogEntries.find((e) => q.endsWith(`/${e.modelId}`)) : undefined
+    const entries = linked ? [linked] : catalogEntries.filter((e) => e.name.toLowerCase().includes(q))
     return json(200, {
-      providers: [{ id: 'anthropic', name: 'Anthropic', count: 2 }],
+      resolved: !!linked,
+      providers: [
+        { id: 'anthropic', name: 'Anthropic', count: 2 },
+        { id: 'openrouter', name: 'OpenRouter', count: 9 },
+        { id: 'lambda', name: 'Lambda Inference Tech', count: 3 }, // a…n…t…h in order: a fuzzy match, not a substring
+      ],
       entries,
       total: entries.length,
       modelKind: 'model',
       linkKind: 'provider',
+    })
+  }
+  if (url.pathname === '/api/v1/catalog/update' && method === 'POST') {
+    const target = items.find((i) => i.id === body.targetId)!
+    const e = catalogEntries.find((x) => x.modelId === body.modelId)!
+    if (!body.dryRun) target.name = e.name
+    return json(200, {
+      item: { ...target, name: e.name },
+      snapshotId: body.dryRun ? undefined : 'S9',
+      dryRun: body.dryRun,
+      changes: [
+        { key: 'name', old: 'Claude Sonnet 5.5', new: e.name },
+        { key: 'context_window', old: 1000000, new: 2000000 },
+      ],
+      prices: [
+        { providerId: 'p1', providerName: 'OpenRouter', source: 'OpenRouter', status: 'updated',
+          old: { input_price: 3, output_price: 15 }, new: { input_price: 4.4, output_price: 22 } },
+        { providerId: 'p2', providerName: 'Some Cloud', source: '', status: 'not_found', old: { input_price: 9 }, new: { input_price: 9 } },
+      ],
     })
   }
   if (url.pathname === '/api/v1/catalog/import' && method === 'POST') {
@@ -137,6 +163,8 @@ const catalogEntries = [
     name: 'Claude Opus 5.5', vendor: 'Anthropic', context: 1000000, modalities: ['text'], inputPrice: 5, outputPrice: 25 },
   { providerId: 'anthropic', providerName: 'Anthropic', modelId: 'claude-haiku-5-5', officialId: 'claude-haiku-5-5',
     name: 'Claude Haiku 5.5', vendor: 'Anthropic', context: 200000, modalities: ['text'] },
+  { providerId: 'openrouter', providerName: 'OpenRouter', modelId: 'anthropic/claude-sonnet-5-6', officialId: 'claude-sonnet-5-6',
+    name: 'Claude Sonnet 5.6', vendor: 'Anthropic', context: 2000000, modalities: ['text'], inputPrice: 4.4, outputPrice: 22 },
 ]
 
 let location = ''
@@ -802,6 +830,101 @@ test('models.dev import: search, pick, price goes to the matching provider, draw
     modelId: 'claude-opus-5-5',
     linkTo: items.find((i) => i.name === 'Anthropic API')!.id,
   })
+})
+
+test('models.dev import: the provider filter narrows by typed text', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await user.click(await screen.findByRole('button', { name: '数据' }))
+  await user.click(await screen.findByRole('menuitem', { name: '从 models.dev 导入模型…' }))
+  const dlg = within(await screen.findByRole('dialog'))
+  const trigger = dlg.getByRole('button', { name: '按渠道筛选' })
+  await waitFor(() => expect(trigger).toHaveTextContent('全部渠道'))
+
+  await user.click(trigger)
+  await user.type(await screen.findByLabelText('搜索渠道'), 'anth')
+  // Scoped to the popup: the model list behind it is a listbox of options too.
+  const list = () => within(screen.getByLabelText('搜索渠道').closest('[data-slot=command]') as HTMLElement)
+  const names = () => list().getAllByRole('option').map((o) => o.textContent)
+  await waitFor(() => expect(names()).toEqual(['Anthropic2']))
+  await user.click(list().getByRole('option', { name: /Anthropic/ }))
+
+  await waitFor(() => expect(trigger).toHaveTextContent('Anthropic（2）'))
+  await waitFor(() => expect(requests.some((r) => r.path.includes('provider=anthropic'))).toBe(true))
+
+  // The id matches too, and 全部渠道 resets the filter.
+  await user.click(trigger)
+  await user.type(await screen.findByLabelText('搜索渠道'), 'openrouter')
+  await waitFor(() => expect(names()).toEqual(['OpenRouter9']))
+  await user.clear(screen.getByLabelText('搜索渠道'))
+  await user.click(list().getByRole('option', { name: '全部渠道' }))
+  await waitFor(() => expect(trigger).toHaveTextContent('全部渠道'))
+})
+
+test('the Model column imports from a pasted model page link', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  // Only the kind marked catalogImport gets the button.
+  expect(within(column('Harness')).queryByRole('button', { name: /^导入/ })).toBeNull()
+  expect(within(column('Provider')).queryByRole('button', { name: /^导入/ })).toBeNull()
+  await user.click(within(column('Model')).getByRole('button', { name: '导入 Model' }))
+
+  const dlg = within(await screen.findByRole('dialog', { name: '从 models.dev 导入模型' }))
+  const link = 'https://openrouter.ai/anthropic/claude-sonnet-5-6'
+  await user.type(dlg.getByLabelText('搜索模型'), link)
+  await waitFor(() => expect(dlg.getByRole('option', { name: /Claude Sonnet 5.6/ })).toHaveAttribute('aria-selected', 'true'))
+  expect(dlg.getByText('已从链接定位到该模型')).toBeInTheDocument()
+  await user.click(dlg.getByRole('button', { name: '导入' }))
+
+  await waitFor(() => expect(requests.some((r) => r.path === '/api/v1/catalog/import')).toBe(true))
+  expect(requests.find((r) => r.path === '/api/v1/catalog/import')!.body).toEqual({
+    providerId: 'openrouter',
+    modelId: 'anthropic/claude-sonnet-5-6',
+    linkTo: items.find((i) => i.name === 'OpenRouter')!.id, // guessed by name, as before
+    sourceUrl: link,
+  })
+})
+
+test('从链接更新 previews a dry run and writes only on confirm', async () => {
+  const user = userEvent.setup()
+  renderPage()
+  await screen.findByText('AI 技术栈')
+  const menuItems = async (name: string) => {
+    await user.click(screen.getByRole('button', { name: `${name} 菜单` }))
+    const names = within(await screen.findByRole('menu')).getAllByRole('menuitem').map((m) => m.textContent)
+    await user.keyboard('{Escape}')
+    await waitFor(() => expect(screen.queryByRole('menu')).toBeNull())
+    return names
+  }
+  expect(await menuItems('Claude Code')).not.toContain('从链接更新…')
+  expect(await menuItems('OpenRouter')).not.toContain('从链接更新…')
+
+  await user.click(screen.getByRole('button', { name: 'Claude Sonnet 5.5 菜单' }))
+  await user.click(await screen.findByRole('menuitem', { name: '从链接更新…' }))
+  const dlg = within(await screen.findByRole('dialog', { name: '用新版本更新 Claude Sonnet 5.5' }))
+  expect(dlg.queryByLabelText('同时把价格记录到渠道')).toBeNull()
+  expect(dlg.getByRole('button', { name: '更新' })).toBeDisabled()
+
+  await user.type(dlg.getByLabelText('搜索模型'), 'https://openrouter.ai/anthropic/claude-sonnet-5-6')
+  const preview = within(await dlg.findByRole('region', { name: '更新预览' }))
+  expect(preview.getByText('名称')).toBeInTheDocument()
+  expect(preview.getByText('上下文窗口').nextElementSibling).toHaveTextContent('1,000,000 tokens → 2,000,000 tokens')
+  expect(preview.getByText('匹配 OpenRouter')).toBeInTheDocument()
+  expect(preview.getByText('未找到对应渠道，保留旧价格')).toBeInTheDocument()
+  const updates = () => requests.filter((r) => r.path === '/api/v1/catalog/update')
+  expect(updates().map((r) => (r.body as { dryRun: boolean }).dryRun)).toEqual([true])
+
+  await user.click(dlg.getByRole('button', { name: '更新' }))
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  expect(updates().at(-1)!.body).toEqual({
+    targetId: items.find((i) => i.name === 'Claude Sonnet 5.6')!.id,
+    providerId: 'openrouter',
+    modelId: 'anthropic/claude-sonnet-5-6',
+    sourceUrl: 'https://openrouter.ai/anthropic/claude-sonnet-5-6',
+    dryRun: false,
+  })
+  expect(await screen.findByRole('button', { name: 'Claude Sonnet 5.6' })).toBeInTheDocument()
 })
 
 test('a drop onto another group snaps back and explains the rule', async () => {

@@ -8,4 +8,5 @@ export interface ItemActions {
   remove: (item: Item) => void
   link: (item: Item) => void // enter relation mode with this item as the source
   focus: (item: Item) => void // enter focus mode on this item
+  updateFromCatalog: (item: Item) => void // overwrite with another catalog entry, e.g. its next version
 }

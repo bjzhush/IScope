@@ -32,6 +32,8 @@ export interface ItemCardProps {
   linking?: boolean
   // Snapshot preview: not clickable, full details, and a menu with 聚焦关联 only.
   readOnly?: boolean
+  // The menu offers 从链接更新… (Kind.catalogImport).
+  catalog?: boolean
   // Supplied by the sortable wrapper.
   ref?: React.Ref<HTMLElement>
   style?: React.CSSProperties
@@ -42,7 +44,7 @@ export interface ItemCardProps {
 }
 
 export function ItemCard(props: ItemCardProps) {
-  const { item, fields, actions, emphasis, onHover, select, linking, readOnly, ref, style, dragging, dragHandleProps, dragHint } =
+  const { item, fields, actions, emphasis, onHover, select, linking, readOnly, catalog, ref, style, dragging, dragHandleProps, dragHint } =
     props
   const activate = () => {
     if (select) select.onToggle()
@@ -112,7 +114,7 @@ export function ItemCard(props: ItemCardProps) {
         <CardDetails item={item} fields={fields} full={readOnly} />
         {item.pinned && <Pin aria-label="已置顶" className="size-3.5 shrink-0 text-muted-foreground" />}
         <Badge className={cn('shrink-0', statusBadgeClass[item.status])}>{statusLabel(item.status)}</Badge>
-        {!linking && <ItemMenu item={item} actions={actions} readOnly={readOnly} />}
+        {!linking && <ItemMenu item={item} actions={actions} readOnly={readOnly} catalog={catalog} />}
       </div>
     </article>
   )

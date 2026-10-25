@@ -193,7 +193,7 @@ func jsonStr(v any) string {
 func TestHandlers(t *testing.T) {
 	im, _, _ := newImporter(t)
 	mux := http.NewServeMux()
-	NewHandler(im.source, im).Register(mux)
+	NewHandler(im.source, im, nil).Register(mux)
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest("GET", "/api/v1/catalog?q=gemini", nil))

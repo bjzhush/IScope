@@ -73,7 +73,8 @@
                     "label": "\u53d1\u5e03\u65e5\u671f",
                     "type": "date"
                 }
-            ]
+            ],
+            "catalogImport": true
         },
         {
             "key": "provider",

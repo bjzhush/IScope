@@ -44,6 +44,13 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - `model_id` stores the vendor's official id, taken from `canonical_model_id`. Existing models are matched by that id first, then by slug.
     - With `linkTo` set, the import upserts `offered_by` with that provider's prices. If the provider's own model id differs from the official one, it goes into `provider_model_id`.
     - The search response names `modelKind` and `linkKind`, so the UI never hard-codes kind keys.
+    - `Kind.CatalogImport` marks the kind the catalog writes (model). Its column has an 导入 button beside +, and its cards have 从链接更新….
+    - A model page link as `q` resolves to one entry (`resolved: true`).
+      - `models.dev/models/<lab>/<model>` matches by canonical id, preferring the lab's own provider.
+      - Any other host is matched against each provider's `api`/`doc` host. The longest model id that appears in the path as whole segments wins.
+      - When nothing matches, the last path segment is searched as a keyword, within the host's provider if there is one.
+    - With `sourceUrl`, the page becomes one of the item's links. An existing link with that URL is left alone, the first link on the same host is replaced (an older version's page), and otherwise the link is appended. It is labelled "models.dev" or with the provider name.
+    - The dialog's 渠道 filter is a searchable list that matches plain substrings, not cmdk's fuzzy score.
 20. Relation mode starts from a card's 编辑关联… menu item. Cards in related columns become checkboxes, and every toggle immediately PUTs the source's full link set with no attrs, so existing attrs are kept. Esc or 完成 leaves the mode.
 21. Screens narrower than 900px show the columns as tabs (`useMediaQuery`).
 
@@ -80,6 +87,14 @@ Personal "AI 技术栈概览页". The full design is in `docs/design.md`. Read i
     - An import that changes something saves a 导入 JSON 前 snapshot inside its transaction (`transfer.Snapshotter`), so a failed import leaves none. The board is exported before the transaction starts, because the pool has one connection.
     - The preview is `BoardPage` at `/boards/:key/snapshots/:snapshotId` in read-only mode. It never fetches the live board. It keeps search, the status filter, hover linking, edge hints and focus mode. It drops the add buttons, dragging, the drawer, relation mode and the 数据 menu. Cards are not clickable, their menu has only 聚焦关联, and the details popover lists every field with a value plus the notes.
     - The list is a dialog under 数据 → 快照…. The shadcn `AlertDialogAction` here is a plain button, so a confirm handler must close the dialog itself.
+
+30. 从链接更新 (`POST /api/v1/catalog/update`, `catalog.Updater`) overwrites a model with another catalog entry, usually its next version.
+    - What changes: the name, and all `catalogKeys` attrs. Keys the new entry lacks are cleared, so no old version's value survives.
+    - What stays: the slug, relations (including 默认模型), summary, tags, rating, notes, pin and status.
+    - Prices: each offered_by gets the new entry's prices and `provider_model_id` from the catalog provider matched by name (`matchProvider`). The match is the same normalized name, else the shortest name containing it or contained in it. An unmatched provider, or one that does not offer the model, keeps its old prices and is reported as `not_found`.
+    - Another model with the new `model_id` makes the update 409.
+    - One transaction writes the snapshot (`更新前：旧 → 新`), the item (`items.ImportTx`) and the relations (`relations.ImportTx`). `dryRun` runs the same transaction and rolls it back, and the dialog shows that result as its preview before the 更新 button is enabled.
+    - `transfer.Snapshotter.CreateTx` returns the snapshot id, so the success toast links to it.
 
 ## Implementation notes
 

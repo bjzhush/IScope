@@ -143,6 +143,7 @@ test('preview shows the snapshot read-only and never writes', async () => {
 
   // No way to write: no add buttons, data menu, drag handles or clickable cards.
   expect(screen.queryByRole('button', { name: /^新增/ })).toBeNull()
+  expect(screen.queryByRole('button', { name: /^导入/ })).toBeNull()
   expect(screen.queryByRole('button', { name: '数据' })).toBeNull()
   expect(screen.queryByRole('button', { name: /^拖动/ })).toBeNull()
   expect(document.querySelector('[data-handle="blocked"]')).toBeNull()

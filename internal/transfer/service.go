@@ -61,10 +61,10 @@ type Service struct {
 	snapshots Snapshotter
 }
 
-// Snapshotter records the board as it was before an import, inside the
-// import's transaction (implemented by internal/snapshot).
+// Snapshotter records the board as it was before a change, inside the
+// change's transaction, and returns the snapshot's id (internal/snapshot).
 type Snapshotter interface {
-	CreateTx(ctx context.Context, q *db.Queries, doc Document, label string) error
+	CreateTx(ctx context.Context, q *db.Queries, doc Document, label string) (string, error)
 }
 
 // SetSnapshotter makes every import that changes something save a snapshot first.
@@ -203,7 +203,8 @@ func (s *Service) Import(ctx context.Context, doc Document) (Summary, error) {
 		}
 		// Written last, so a failed import leaves no snapshot behind.
 		if s.snapshots != nil && sum.changed() {
-			return s.snapshots.CreateTx(ctx, q, before, "导入 JSON 前")
+			_, err := s.snapshots.CreateTx(ctx, q, before, "导入 JSON 前")
+			return err
 		}
 		return nil
 	})

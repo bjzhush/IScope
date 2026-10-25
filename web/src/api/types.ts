@@ -35,6 +35,8 @@ export interface Kind {
   label: string
   icon: string
   fields: Field[]
+  // Items of this kind can be imported and updated from the models.dev catalog.
+  catalogImport?: boolean
 }
 
 export interface RelationType {
@@ -173,12 +175,58 @@ export interface CatalogEntry {
   outputPrice?: number
 }
 
+export interface CatalogProvider {
+  id: string
+  name: string
+  count: number
+}
+
 export interface CatalogSearch {
-  providers: { id: string; name: string; count: number }[]
+  providers: CatalogProvider[]
   entries: CatalogEntry[]
   total: number
+  resolved: boolean // q was a model page link naming exactly this one entry
   modelKind: string // kind of the items an import creates
   linkKind: string // kind that can receive the model's prices
+}
+
+export interface CatalogImportInput {
+  providerId: string
+  modelId: string
+  linkTo?: string
+  sourceUrl?: string
+}
+
+export interface CatalogUpdateInput {
+  targetId: string
+  providerId: string
+  modelId: string
+  sourceUrl?: string
+  dryRun: boolean
+}
+
+// One value the update replaces: 'name' or an attr key.
+export interface CatalogChange {
+  key: string
+  old: AttrValue | null
+  new: AttrValue | null
+}
+
+export interface CatalogPriceChange {
+  providerId: string
+  providerName: string
+  source: string // the matched catalog provider, '' when none
+  status: 'updated' | 'unchanged' | 'not_found'
+  old: Record<string, AttrValue>
+  new: Record<string, AttrValue>
+}
+
+export interface CatalogUpdateResult {
+  item: Item
+  snapshotId?: string
+  changes: CatalogChange[]
+  prices: CatalogPriceChange[]
+  dryRun: boolean
 }
 
 export interface CatalogImportResult {

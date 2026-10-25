@@ -5,8 +5,11 @@ import type {
   Item,
   ItemDetail,
   ItemPatch,
+  CatalogImportInput,
   CatalogImportResult,
   CatalogSearch,
+  CatalogUpdateInput,
+  CatalogUpdateResult,
   ImportSummary,
   MoveInput,
   Relation,
@@ -61,8 +64,8 @@ export const api = {
   importData: (doc: unknown) => request<ImportSummary>('POST', '/import', doc),
   catalog: (q: string, provider: string) =>
     request<CatalogSearch>('GET', `/catalog?${new URLSearchParams({ q, provider })}`),
-  catalogImport: (input: { providerId: string; modelId: string; linkTo?: string }) =>
-    request<CatalogImportResult>('POST', '/catalog/import', input),
+  catalogImport: (input: CatalogImportInput) => request<CatalogImportResult>('POST', '/catalog/import', input),
+  catalogUpdate: (input: CatalogUpdateInput) => request<CatalogUpdateResult>('POST', '/catalog/update', input),
   snapshots: () => request<SnapshotMeta[]>('GET', '/snapshots'),
   createSnapshot: (label: string) => request<SnapshotMeta>('POST', '/snapshots', { label }),
   deleteSnapshot: (id: string) => request<void>('DELETE', `/snapshots/${encodeURIComponent(id)}`),

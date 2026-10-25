@@ -79,9 +79,9 @@ func (s *Service) Create(ctx context.Context, label string) (Meta, error) {
 }
 
 // CreateTx saves doc inside the caller's transaction (transfer.Snapshotter).
-func (s *Service) CreateTx(ctx context.Context, q *db.Queries, doc transfer.Document, label string) error {
-	_, err := s.insert(ctx, q, doc, label)
-	return err
+func (s *Service) CreateTx(ctx context.Context, q *db.Queries, doc transfer.Document, label string) (string, error) {
+	m, err := s.insert(ctx, q, doc, label)
+	return m.ID, err
 }
 
 func (s *Service) insert(ctx context.Context, q *db.Queries, doc transfer.Document, label string) (Meta, error) {
